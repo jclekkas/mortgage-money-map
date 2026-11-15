@@ -1,0 +1,393 @@
+// Mortgage Money Map: all content. Real firms appear in their real roles for realism only.
+// Figures marked "approx." are rounded public figures; figures marked "example" are illustrative.
+export type View = "agency" | "nonagency" | "crt" | "servicing";
+export type ViewSel = "all" | View;
+export type OwnKind = "loan" | "sec" | "risk" | "msr" | "cash";
+export type FlowKind = "asset" | "pay" | "fee" | "cash" | "risk" | "info";
+export type RiskKey = "credit" | "prepay" | "rate" | "liquidity";
+
+export const DISCLAIMER = "Educational tool. Real company names are used only to show which kinds of firms play each role; no affiliation, endorsement or inside knowledge is implied. Dollar figures are illustrative examples or rounded public figures labeled approx.; nothing here describes any firm's actual terms, results or conduct, and nothing here is investment advice.";
+
+export const VIEW_LABEL: Record<ViewSel, string> = { all: "Everything", agency: "Agency (government-backed)", nonagency: "Non-agency (private-label)", crt: "Credit risk transfer, CRT", servicing: "Servicing (collecting payments)" };
+export const VIEW_SHORT: Record<ViewSel, string> = { all: "Everything", agency: "Agency", nonagency: "Non-agency", crt: "CRT", servicing: "Servicing" };
+
+export const OWN: Record<OwnKind, { label: string; short: string; glyph: string; color: string }> = {
+  loan: { label: "Owns the loan (the IOU itself)", short: "Owns the loan", glyph: "L", color: "#2bd47d" },
+  sec: { label: "Owns the security, MBS (the bond)", short: "Owns the bond", glyph: "S", color: "#4d9fff" },
+  risk: { label: "Owns only the risk (pays if loans go bad)", short: "Owns only risk", glyph: "R", color: "#ff6b8b" },
+  msr: { label: "Owns servicing rights, MSR (the right to collect)", short: "Owns servicing rights", glyph: "M", color: "#a78bfa" },
+  cash: { label: "Handles cash or records for a fee (owns nothing)", short: "Handles for a fee", glyph: "$", color: "#ffb547" },
+};
+
+export const FLOW_KIND: Record<FlowKind, { label: string; color: string }> = {
+  asset: { label: "Loans or bonds change hands", color: "#2bd47d" },
+  pay: { label: "Monthly payments", color: "#22c3a6" },
+  cash: { label: "Cash to buy or fund", color: "#4d9fff" },
+  fee: { label: "Fees", color: "#ffb547" },
+  risk: { label: "Guarantees and insurance", color: "#ff6b8b" },
+  info: { label: "Rules, records and ratings", color: "#8b96a5" },
+};
+
+export const RISK: Record<RiskKey, { label: string; plain: string; color: string }> = {
+  credit: { label: "Credit risk (the borrower stops paying)", plain: "Who loses money if homeowners default and the house sells for less than the loan.", color: "#ff6b8b" },
+  prepay: { label: "Prepayment risk (paid back too early)", plain: "Who loses when homeowners refinance or move and pay off early, usually right when rates fall and you'd want to keep the loan.", color: "#f5a524" },
+  rate: { label: "Interest rate risk (rates move against you)", plain: "Who loses when market interest rates change: fixed-rate loans and bonds fall in value when rates rise.", color: "#4d9fff" },
+  liquidity: { label: "Liquidity risk (cash runs short)", plain: "Who gets hurt if they suddenly need cash, or can't sell or borrow against what they hold.", color: "#a78bfa" },
+};
+
+export const LANES = ["MAKING LOANS", "PLUMBING & INSURERS", "GUARANTORS & ISSUERS", "THE SECURITIES", "TRADING & SETTLEMENT", "INVESTORS"];
+
+export type Player = {
+  id: string; label: string; role: string; name: string; lane: number; row: number; views: View[];
+  does: string; like: string; paid: string; incent: string; risks: string; examples: string;
+  crisis?: { then: string; now: string };
+};
+
+const A: View[] = ["agency"], N: View[] = ["nonagency"], C: View[] = ["crt"], S: View[] = ["servicing"];
+const AN: View[] = ["agency", "nonagency"], ANS: View[] = ["agency", "nonagency", "servicing"], ALL4: View[] = ["agency", "nonagency", "crt", "servicing"];
+export { A as V_A, N as V_N, C as V_C, S as V_S, AN as V_AN, ANS as V_ANS, ALL4 as V_ALL4 };
+
+export const PLAYERS: Player[] = [
+  { id: "broker", label: "Mortgage brokers", role: "the matchmakers", name: "Mortgage brokers (the matchmakers)", lane: 0, row: 0, views: AN,
+    does: "Shop the borrower's application to several wholesale lenders and help gather documents. They never lend their own money.", like: "A travel agent who books you on someone else's airline.", paid: "A broker fee, often approx. 1% to 2.75% of the loan, paid by the lender or the borrower (capped by federal rules).", incent: "Close as many loans as possible at a rate that wins the borrower.", risks: "Little financial risk; mostly licensing and reputation.", examples: "Thousands of independent brokerages nationwide." },
+  { id: "borrower", label: "Borrower", role: "the homebuyer", name: "Borrower (the homebuyer)", lane: 0, row: 1, views: ALL4,
+    does: "Signs two papers at closing: the promissory note (the IOU) and the mortgage or deed of trust (the lien that lets the lender take the house if the loan isn't paid). Then pays every month.", like: "The person at the top of the river: every dollar downstream starts as their monthly payment.", paid: "Gets the money to buy a home. Pays interest, upfront fees, insurance and escrow.", incent: "Lowest monthly payment and smallest closing costs; the option to refinance if rates fall.", risks: "Owns the home's ups and downs (home equity). Owes the loan no matter what the house is worth.", examples: "Roughly 6 in 10 US owner households have a mortgage (approx.).",
+    crisis: { then: "Many 2005 to 2007 loans were approved with no income check (\"liar loans\") and payments that jumped after 2 years.", now: "Ability-to-Repay rule, ATR (prove you can afford it): lenders must verify income and debts." } },
+  { id: "uwm", label: "United Wholesale Mtg.", role: "the wholesale lender", name: "United Wholesale Mortgage (the wholesale lender)", lane: 0, row: 2, views: AN,
+    does: "Lends through brokers rather than directly to consumers: underwrites, funds the loan in its own name, then sells it or swaps it into agency MBS.", like: "A factory that sells only through dealers, not in its own store.", paid: "Gain on sale (the profit when a loan sells for more than it cost), plus servicing income on loans it keeps servicing.", incent: "Volume and speed; keep brokers loyal.", risks: "Pipeline risk (rates move between rate lock and sale), repurchase demands if a loan breaks the rules.", examples: "United Wholesale Mortgage is one of the largest US lenders by volume (approx.)." },
+  { id: "rocket", label: "Rocket Mortgage", role: "the retail lender", name: "Rocket Mortgage (the retail lender)", lane: 0, row: 3, views: ANS,
+    does: "Lends directly to consumers online and by phone, then delivers loans to Fannie Mae, Freddie Mac or Ginnie Mae pools. Often keeps the servicing rights.", like: "A store that makes and sells its own product, then keeps a subscription to service it.", paid: "Gain on sale, origination fees and points, plus the servicing fee strip on loans it services.", incent: "Win borrowers, sell loans at the best price, keep the servicing relationship for future refinances.", risks: "Pipeline interest rate risk (hedged with TBA sales), funding risk on warehouse lines, repurchase risk.", examples: "Rocket Mortgage (part of Rocket Companies, which acquired Mr. Cooper in 2025) is one of the largest US retail lenders." },
+  { id: "wells", label: "Wells Fargo", role: "the bank lender", name: "Wells Fargo (the bank lender)", lane: 0, row: 4, views: AN,
+    does: "A bank that makes mortgages to its customers. It can sell them to the agencies or keep them (especially jumbo loans) on its own balance sheet funded by deposits.", like: "A store that can also put product in its own warehouse instead of selling it.", paid: "Gain on sale, or interest income if it keeps the loan.", incent: "Serve existing customers; keep high-quality jumbo loans as investments.", risks: "If it keeps loans: credit, rate and prepayment risk on its own books.", examples: "Wells Fargo was long the biggest bank lender and has shrunk its mortgage business since 2023 (public reports)." },
+  { id: "smalllender", label: "Community lenders", role: "small banks, credit unions", name: "Community banks and credit unions (the small lenders)", lane: 0, row: 5, views: A,
+    does: "Make loans locally and often sell them one at a time to Fannie Mae or Freddie Mac for cash (the cash window) or to a correspondent aggregator.", like: "A small farm selling its crop at the co-op instead of running its own brand.", paid: "Gain on sale and origination fees; sometimes keep the servicing.", incent: "Simple, quick sales so their limited cash can make the next loan.", risks: "Rate risk until the loan is sold; repurchase demands for errors.", examples: "Thousands of community banks and credit unions sell through the Fannie Mae and Freddie Mac cash windows." },
+  { id: "pennymac", label: "PennyMac", role: "aggregator, Ginnie issuer", name: "PennyMac (the correspondent aggregator and Ginnie issuer)", lane: 0, row: 6, views: ["agency", "servicing"],
+    does: "Buys closed loans from many smaller correspondent lenders, bundles them, and delivers them into Fannie, Freddie or Ginnie Mae pools. As a Ginnie Mae issuer it issues the Ginnie MBS itself and must advance missed payments.", like: "A wholesaler that buys from many small farms and sells by the truckload.", paid: "The spread between what it pays small lenders and what the pooled loans sell for, plus servicing fees.", incent: "Scale: the more loans it buys, the cheaper its funding and servicing per loan.", risks: "Pipeline rate risk, advancing (liquidity) risk on Ginnie loans, MSR value swings.", examples: "PennyMac Financial Services is one of the largest correspondent aggregators and Ginnie Mae issuers (approx.)." },
+  { id: "warehouse", label: "Warehouse lenders", role: "short-term funders", name: "Warehouse lenders (the short-term funders)", lane: 0, row: 7, views: AN,
+    does: "Lend non-bank lenders the cash to fund each closing, holding the new loan as collateral for days or weeks until it's sold.", like: "A pawn shop for brand-new loans: cash now, get your item back when you repay.", paid: "Interest on the line (a floating rate plus a spread) and fees.", incent: "Lend to well-run lenders; get repaid fast when loans sell.", risks: "A lender failing with loans that can't be sold (2007 saw many).", examples: "Big banks such as JPMorgan Chase, plus specialist banks such as Texas Capital." },
+  { id: "fhlb", label: "FHLBanks", role: "the banks' bank", name: "Federal Home Loan Banks, FHLBanks (the banks' bank)", lane: 0, row: 8, views: A,
+    does: "Eleven regional cooperatives, created by Congress in 1932, that lend member banks and insurers cheap advances secured by mortgages and MBS.", like: "A wholesale club where members pledge their mortgages to borrow at a discount.", paid: "Interest on advances; members get dividends.", incent: "Support housing finance and keep members liquid.", risks: "Lending to a failing member (a debate after the 2023 bank failures).", examples: "FHLBank of New York, FHLBank of Atlanta, and nine others." },
+  { id: "appraiser", label: "Appraisers", role: "home value checkers", name: "Appraisers (the home value checkers)", lane: 1, row: 0, views: AN,
+    does: "Inspect the home and estimate its value so the loan-to-value ratio, LTV (loan as a share of the home price) is real.", like: "A referee for the house price.", paid: "A flat appraisal fee, typically approx. $400 to $700, paid by the borrower.", incent: "Be independent of the lender's wish to close (rules since 2009 enforce this).", risks: "Liability for inflated values.", examples: "Independent licensed appraisers, often hired through appraisal management companies.",
+    crisis: { then: "Some appraisers felt pressure to 'hit the number' so deals would close.", now: "Appraiser independence rules (Dodd-Frank) bar lenders from pressuring appraisers." } },
+  { id: "bureaus", label: "Credit bureaus", role: "Equifax, Experian, TU", name: "Equifax, Experian, TransUnion (the credit bureaus)", lane: 1, row: 1, views: AN,
+    does: "Supply the credit reports and scores lenders and the agencies use to price and approve loans.", like: "Your financial report card.", paid: "A fee per credit report pulled.", incent: "Sell more data and scores.", risks: "Errors and data breaches.", examples: "Equifax, Experian and TransUnion; scores such as FICO and VantageScore." },
+  { id: "title", label: "Title insurers", role: "ownership insurers", name: "First American, Fidelity National (the title insurers)", lane: 1, row: 2, views: AN,
+    does: "Check that the seller really owns the home and there are no hidden liens, then insure the lender (and optionally the buyer) against title defects.", like: "Insurance that the house you bought was really the seller's to sell.", paid: "A one-time premium at closing that varies a lot by state (often a few tenths of a percent of the price, example).", incent: "Clean title searches keep claims low.", risks: "Fraud and title defects.", examples: "First American, Fidelity National Financial, Old Republic, Stewart." },
+  { id: "mers", label: "MERS", role: "electronic lien registry", name: "MERS (the electronic lien registry)", lane: 1, row: 3, views: ALL4,
+    does: "Mortgage Electronic Registration Systems, MERS (an electronic address book for mortgages) is named in county records as the lender's nominee, then tracks later transfers of servicing and ownership electronically so the county file doesn't need updating each time.", like: "A car-title database that follows the car through every owner.", paid: "Membership and per-loan registration fees from lenders and servicers.", incent: "Accurate, cheap tracking for its members.", risks: "Legal challenges over its role in foreclosures (around 2010).", examples: "MERS is owned by Intercontinental Exchange (ICE).",
+    crisis: { then: "Foreclosure document scandals (\"robo-signing\", 2010) raised questions about who could prove ownership.", now: "Tighter document standards and national servicing settlements." } },
+  { id: "custodian", label: "Document custodians", role: "the note vaults", name: "U.S. Bank, Computershare (the document custodians)", lane: 1, row: 4, views: ALL4,
+    does: "Physically or electronically hold the original signed note and check the loan file before a pool is issued, on behalf of whoever owns the loan or the pool.", like: "A safe-deposit box for the IOU.", paid: "Per-file custody fees.", incent: "Accurate, secure files.", risks: "Lost documents and operational errors.", examples: "U.S. Bank, Computershare, Deutsche Bank and others." },
+  { id: "fha", label: "FHA · VA · USDA", role: "government loan insurers", name: "FHA, VA and USDA (the government loan insurers)", lane: 1, row: 5, views: ["agency", "crt"],
+    does: "Federal programs that insure or guarantee loans for lower down payment buyers (FHA), veterans (VA) and rural buyers (USDA). These loans go into Ginnie Mae pools.", like: "A government co-signer.", paid: "FHA charges mortgage insurance premiums, MIP (upfront approx. 1.75% plus approx. 0.55% a year); VA charges a one-time funding fee.", incent: "Expand homeownership while keeping the insurance fund solvent.", risks: "Credit risk on most of the loan amount.", examples: "Federal Housing Administration (part of HUD), Department of Veterans Affairs, USDA Rural Development." },
+  { id: "mi", label: "Mortgage insurers", role: "first-loss insurers", name: "MGIC, Radian, Essent, Arch MI (the private mortgage insurers)", lane: 1, row: 6, views: ["agency", "crt"],
+    does: "Fannie Mae and Freddie Mac's charters require extra protection when a borrower puts down less than 20%. Private mortgage insurance, PMI (deductible cover for the lender) pays a chunk of the loss, often the top 25% to 35% of the loan, if the borrower defaults.", like: "A co-signer who'll eat the first slice of loss.", paid: "Monthly PMI premiums from the borrower, often approx. 0.3% to 1.0% of the loan a year (example range), until about 20% equity.", incent: "Insure good borrowers; price risk well.", risks: "Credit risk; they buy reinsurance and issue insurance-linked notes to share it.", examples: "MGIC, Radian, Essent, Arch MI, Enact, National MI." },
+  { id: "escrow", label: "Escrow payees", role: "taxes & home insurance", name: "County tax offices and home insurers (the escrow recipients)", lane: 1, row: 7, views: S,
+    does: "Receive property taxes and homeowners insurance premiums that the servicer pays from the borrower's escrow account.", like: "The bills a landlord pays for you when you rent.", paid: "Taxes and insurance premiums.", incent: "Get paid on time.", risks: "None in this chain.", examples: "County tax offices; home insurers such as State Farm and Allstate." },
+  { id: "fhfa", label: "FHFA", role: "regulator, conservator", name: "FHFA (the regulator and conservator)", lane: 2, row: 0, views: ["agency", "crt"],
+    does: "The Federal Housing Finance Agency regulates Fannie Mae, Freddie Mac and the FHLBanks, and since September 2008 runs Fannie and Freddie as conservator (a court-style caretaker).", like: "A guardian appointed to run a company that nearly failed.", paid: "Funded by assessments on the firms it regulates.", incent: "Keep the GSEs safe and sound while supporting housing.", risks: "Policy risk: decisions on g-fees, capital and ending conservatorship move markets.", examples: "Created by the Housing and Economic Recovery Act of 2008.",
+    crisis: { then: "Its predecessor (OFHEO) had weak powers; Fannie and Freddie ran with thin capital.", now: "FHFA sets capital rules, g-fee policy and CRT expectations, and decides on conservatorship." } },
+  { id: "treasury", label: "U.S. Treasury", role: "the backstop", name: "U.S. Treasury (the backstop)", lane: 2, row: 1, views: ["agency", "crt"],
+    does: "Under the Senior Preferred Stock Purchase Agreements, PSPAs (a standby credit line) Treasury promised to inject capital so Fannie Mae and Freddie Mac never run out of money.", like: "A parent who has co-signed a big promise.", paid: "Owns senior preferred stock and warrants; also receives 0.10% a year carved out of g-fees (the TCCA fee).", incent: "Protect taxpayers and the housing market.", risks: "Taxpayer losses if the GSEs fail again.", examples: "Treasury put in approx. $190 billion in 2008 to 2012; the GSEs later paid more than that back in dividends (approx.).",
+    crisis: { then: "Markets assumed an implicit guarantee; nobody had written it down.", now: "The PSPAs make the backstop explicit (with limits)." } },
+  { id: "fannie", label: "Fannie Mae", role: "agency guarantor, GSE", name: "Fannie Mae (the agency guarantor, a GSE)", lane: 2, row: 2, views: ["agency", "crt", "servicing"],
+    does: "A government-sponsored enterprise, GSE (a private company with a public mission) that buys or swaps conforming loans from lenders, puts them in MBS trusts, and guarantees investors get principal and interest on time even if borrowers default.", like: "An insurer that stamps 'payment guaranteed' on each bond.", paid: "Guarantee fee, g-fee (insurance premium), approx. 0.5% to 0.65% a year of the loan balance, plus upfront loan-level price adjustments, LLPAs (risk surcharges).", incent: "Earn g-fees, keep losses low, meet affordable housing goals; share risk via CRT.", risks: "Credit risk on trillions of guaranteed loans (shared via CRT and mortgage insurance).", examples: "Fannie Mae guarantees roughly $4 trillion of single-family loans (approx.).",
+    crisis: { then: "Thin capital and big bets on risky loans and private-label bonds; taken into conservatorship in September 2008.", now: "Capital rules, a much smaller retained portfolio, regular CRT deals, and the UMBS shared bond with Freddie Mac." } },
+  { id: "freddie", label: "Freddie Mac", role: "agency guarantor, GSE", name: "Freddie Mac (the agency guarantor, a GSE)", lane: 2, row: 3, views: ["agency", "crt"],
+    does: "Fannie Mae's sibling GSE with the same job: buys or swaps conforming loans, guarantees the MBS, and since 2019 issues the same Uniform MBS, UMBS (one shared bond) so their bonds trade interchangeably.", like: "A second insurer selling an identical policy.", paid: "G-fees and LLPAs, like Fannie Mae.", incent: "Same as Fannie Mae; compete for lenders on price and service.", risks: "Credit risk, shared via STACR notes and mortgage insurance.", examples: "Freddie Mac guarantees roughly $3 trillion of single-family loans (approx.).",
+    crisis: { then: "Same fate as Fannie Mae: conservatorship in September 2008.", now: "Same reforms; UMBS made Freddie bonds interchangeable with Fannie's (2019)." } },
+  { id: "ginnie", label: "Ginnie Mae", role: "government guarantor", name: "Ginnie Mae (the government guarantor)", lane: 2, row: 4, views: A,
+    does: "A government corporation inside HUD that guarantees MBS backed by FHA, VA and USDA loans with the full faith and credit of the United States. Unlike Fannie and Freddie, Ginnie does not buy loans: approved issuers like PennyMac create the pools and Ginnie adds the guarantee.", like: "The government's own 'payment guaranteed' stamp, the strongest one there is.", paid: "A small guaranty fee, approx. 0.06% a year, plus issuer fees.", incent: "Keep government-insured loans flowing at low cost; watch issuer health.", risks: "Issuer failure: if an issuer can't advance payments, Ginnie steps in and takes over its servicing.", examples: "Ginnie Mae MBS outstanding is roughly $2.5 trillion (approx.)." },
+  { id: "plsissuer", label: "Private sponsors", role: "jumbo & non-QM", name: "Redwood Trust, Angel Oak (the private-label sponsors)", lane: 2, row: 6, views: N,
+    does: "Buy or make loans the agencies won't take, such as jumbo loans (above the conforming limit, approx. $806,500 for 2025 in most places) and non-QM loans (e.g. self-employed or investor borrowers), then sponsor private-label securitizations.", like: "A private brand that builds its own bond with no government stamp.", paid: "Gain on sale when bonds sell for more than the loans cost, plus income on the slice they must keep.", incent: "Buy loans cheaply, sell bonds dearly; must keep 5% of the risk (risk retention).", risks: "Credit and funding risk while holding loans; the retained 5% slice.", examples: "Redwood Trust (Sequoia jumbo deals), Angel Oak (non-QM), J.P. Morgan Mortgage Trust, Verus.",
+    crisis: { then: "Subprime sponsors sold almost everything and kept little risk (originate to distribute).", now: "Dodd-Frank risk retention: sponsors keep 5% of the credit risk (unless loans are qualified mortgages)." } },
+  { id: "depositor", label: "Depositor", role: "pass-through company", name: "Depositor (the pass-through company)", lane: 2, row: 7, views: N,
+    does: "A special shell company owned by the sponsor that buys the loans and immediately sells them to the trust. The two-step sale makes the transfer a clean true sale (a real sale).", like: "A middleman handing a package through a window so it can't be pulled back.", paid: "Nothing extra; it's legal plumbing.", incent: "None; it exists to make the sale bankruptcy-proof.", risks: "None by design.", examples: "Usually named after the sponsor, e.g. '... Mortgage Securities Corp.'" },
+  { id: "monolines", label: "Bond insurers", role: "historical, pre-2008", name: "MBIA and Ambac (the bond insurers, historically)", lane: 2, row: 8, views: N,
+    does: "Before 2008, monoline insurers wrapped some private-label mortgage bonds and CDOs, promising to pay if the bonds defaulted, which let the bonds borrow the insurer's AAA rating.", like: "A co-signer who promised far more than they could cover.", paid: "Insurance premiums from the deal.", incent: "Write more premiums with thin capital.", risks: "Correlated losses: when housing fell everywhere, claims arrived all at once.", examples: "MBIA and Ambac lost their AAA ratings in 2008; Ambac's insurance arm entered rehabilitation in 2010.",
+    crisis: { then: "Their guarantees made risky bonds look AAA; the insurers were downgraded in 2008.", now: "Bond insurance is rare in mortgage deals today." } },
+  { id: "raters", label: "Rating agencies", role: "the graders", name: "Moody's, S&P, Fitch, KBRA (the rating agencies)", lane: 3, row: 0, views: N,
+    does: "Grade each private-label tranche from AAA down, based on how much loss it can survive. Agency MBS don't need ratings because the guarantee carries the risk.", like: "A food critic paid by the restaurant.", paid: "Fees paid by the issuer (the issuer-pays model).", incent: "Win rating mandates (a conflict of interest) while protecting their reputation.", risks: "Reputation and regulatory penalties.", examples: "Moody's, S&P Global Ratings, Fitch, KBRA, DBRS Morningstar.",
+    crisis: { then: "Rated many subprime bonds AAA that later defaulted; issuers could shop for the best rating.", now: "SEC oversight office, disclosure of methods, and more conservative models." } },
+  { id: "agencytrust", label: "Agency MBS trust", role: "UMBS or Ginnie pool", name: "Agency MBS trust or pool (the walled-off box for agency loans)", lane: 3, row: 2, views: ["agency", "crt", "servicing"],
+    does: "The legal container that holds the pooled loans for the bondholders. For UMBS, Fannie Mae or Freddie Mac acts as trustee of the trust; for Ginnie Mae, the issuer's pool is held for investors and Ginnie guarantees it.", like: "A sealed piggy bank: loans go in, monthly payments come out to bondholders.", paid: "Nothing; it's a pass-through. Money in equals money out minus fees.", incent: "None; it just follows its rules.", risks: "None of its own; risks pass to the guarantor and investors.", examples: "UMBS 30-year pools with coupons like 5.5% or 6.0%; Ginnie Mae II pools." },
+  { id: "cas", label: "CAS & STACR notes", role: "credit risk bonds", name: "CAS and STACR notes (the credit risk bonds)", lane: 3, row: 4, views: C,
+    does: "Connecticut Avenue Securities, CAS (Fannie Mae) and Structured Agency Credit Risk, STACR (Freddie Mac) are bonds whose principal shrinks if loans in a reference pool (a list of loans they track, not own) go bad. Investors get no loans and no MBS, just paid to take risk.", like: "Selling slices of your home insurance risk to outside investors.", paid: "Investors earn a floating coupon (SOFR plus a spread) for taking the risk.", incent: "The GSEs cut their risk and capital needs; investors earn high yields.", risks: "Investors lose principal if defaults pass their attachment point.", examples: "Both programs started in 2013; insurance versions are CIRT (Fannie Mae) and ACIS (Freddie Mac)." },
+  { id: "plstrust", label: "Private-label trust", role: "the SPV", name: "Private-label trust, SPV (the walled-off box)", lane: 3, row: 6, views: N,
+    does: "A special purpose vehicle, SPV (a walled-off box) that owns the non-agency loans after a true sale, issues tranches (floors of risk) and pays them by the waterfall (payment order). It's bankruptcy-remote from the sponsor.", like: "A building whose top floors stay dry longest in a flood.", paid: "Nothing; a pass-through.", incent: "None; it follows its governing documents.", risks: "None of its own; losses flow to the lowest tranche first.", examples: "Trusts named like 'Sequoia Mortgage Trust 2025-X' (format example)." },
+  { id: "trustee", label: "Trustees", role: "bondholders' referee", name: "U.S. Bank, Wilmington Trust (the trustees)", lane: 3, row: 7, views: N,
+    does: "Holds the trust's assets for the bondholders, runs or checks the waterfall payments, and enforces the deal rules against the servicer and sponsor.", like: "A referee holding the keys to the vault.", paid: "A small trustee fee off the top of the waterfall.", incent: "Do the job without much liability.", risks: "Lawsuits if it fails to act.", examples: "U.S. Bank, Wilmington Trust, Computershare, Deutsche Bank." },
+  { id: "tba", label: "TBA market", role: "the forward market", name: "TBA market (the to-be-announced forward market)", lane: 4, row: 0, views: A,
+    does: "Lenders and investors agree today on the price of agency MBS to be delivered next month or later, without naming the exact pools (they're 'to be announced' 48 hours before settlement). This lets lenders lock your rate weeks in advance.", like: "Pre-ordering a generic bag of rice: you know the price and grade, not which farm.", paid: "Not a firm; dealers earn the bid-ask spread. Among the most traded bond markets in the world: approx. $200 to $300 billion a day.", incent: "Liquidity for everyone.", risks: "Counterparty risk (cleared through FICC).", examples: "Trades like 'UMBS 30-year 6.0% for December settlement'. Dollar rolls swap this month's delivery for next month's.",
+    crisis: { then: "The TBA market kept working for agency MBS even as private-label trading froze.", now: "Margin rules (FINRA 4210) and central clearing reduce counterparty risk." } },
+  { id: "dealers", label: "Dealers", role: "the market makers", name: "JPMorgan, Goldman Sachs, BofA (the dealers)", lane: 4, row: 1, views: ["agency", "nonagency", "crt"],
+    does: "Make markets in TBAs and specified pools, underwrite private-label and CRT deals, and lend to REITs through repo (repurchase agreements, collateralized loans).", like: "A used-car lot that always quotes a buy and a sell price.", paid: "Bid-ask spread, underwriting fees, repo interest.", incent: "Turn over inventory with little risk; win deals.", risks: "Inventory price risk and balance sheet limits.", examples: "JPMorgan, Goldman Sachs, Bank of America, Citi, Wells Fargo, Morgan Stanley." },
+  { id: "ficc", label: "DTCC / FICC", role: "the clearinghouse", name: "DTCC's FICC (the clearinghouse)", lane: 4, row: 2, views: A,
+    does: "The Fixed Income Clearing Corporation, FICC (the middleman that guarantees trades) MBS Division nets and guarantees TBA trades between members so one failing dealer doesn't topple the rest.", like: "An escrow agent standing between every buyer and seller.", paid: "Clearing fees from members.", incent: "Keep the system safe; collect margin.", risks: "A big member default.", examples: "FICC is a subsidiary of DTCC." },
+  { id: "fedwire", label: "Fedwire", role: "the settlement rails", name: "Fedwire Securities (the settlement rails)", lane: 4, row: 3, views: A,
+    does: "The Federal Reserve's book-entry system where agency MBS ownership is recorded and moves against cash on settlement day. It also carries monthly payments to bondholders' banks.", like: "The deed office and bank wire rolled into one, for bonds.", paid: "Small per-transfer fees.", incent: "Safe, final settlement.", risks: "Operational outages.", examples: "Run by the Federal Reserve Banks." },
+  { id: "servicer", label: "Servicers", role: "payment collectors", name: "Mr. Cooper, Rocket, PennyMac (the servicers)", lane: 4, row: 5, views: ["agency", "nonagency", "servicing"],
+    does: "Collect monthly payments, run escrow, answer borrower calls, manage forbearance and modifications, foreclose as a last resort, and pass cash on minus their fee. They don't own the loan.", like: "A property manager collecting rent for the owner.", paid: "Servicing fee strip (a slice of the interest), usually approx. 0.25% a year for Fannie and Freddie loans, plus late fees and float on escrow cash.", incent: "Keep loans current; keep borrowers for the next refinance.", risks: "Advancing missed payments (a cash drain), MSR value falls when refis surge, compliance.", examples: "Mr. Cooper (acquired by Rocket Companies in 2025), Rocket, PennyMac, Wells Fargo, Newrez (Rithm Capital).",
+    crisis: { then: "Servicers were swamped by defaults; robo-signing and lost paperwork.", now: "CFPB servicing rules: early outreach, no dual tracking, loss mitigation first." } },
+  { id: "subservicer", label: "Subservicers", role: "hired collectors", name: "Cenlar, Dovenmuehle (the subservicers)", lane: 4, row: 6, views: S,
+    does: "Do the day-to-day servicing work for an MSR owner that doesn't want to run call centers, under contract.", like: "A property management company hired by a landlord.", paid: "A flat fee per loan per month (example: a few dollars to tens of dollars).", incent: "Scale and efficiency.", risks: "Operational and compliance risk; little balance-sheet risk.", examples: "Cenlar, Dovenmuehle, LoanCare." },
+  { id: "msrowner", label: "MSR investors", role: "servicing-rights owners", name: "Rithm Capital, Annaly (the MSR investors)", lane: 4, row: 7, views: S,
+    does: "Buy mortgage servicing rights, MSRs (the right to collect the fee) from lenders, often hiring subservicers to do the work.", like: "Buying a bond whose interest is the servicing fee, which stops when the loan pays off.", paid: "The servicing fee strip plus float, minus the cost of servicing.", incent: "Rates up = fewer refis = MSRs last longer and rise in value.", risks: "Prepayment risk (refis end the fee), advancing, credit costs.", examples: "Rithm Capital (owner of Newrez), Annaly, Two Harbors, and lenders themselves." },
+  { id: "fed", label: "Federal Reserve", role: "QE buyer, now QT", name: "Federal Reserve (the QE buyer, now QT)", lane: 5, row: 0, views: A,
+    does: "Bought agency MBS in quantitative easing, QE (the Fed buying bonds) in 2008 to 2014 and 2020 to 2022 to push mortgage rates down. Since 2022 it has run quantitative tightening, QT (letting its bonds shrink), not reinvesting MBS paydowns into MBS.", like: "A giant buyer who walked into the store, then slowly walked out.", paid: "Interest on its MBS (its profits go to Treasury).", incent: "Policy goals: jobs and stable prices, not profit.", risks: "Market-value losses when rates rise (it doesn't have to sell).", examples: "Fed MBS holdings peaked at approx. $2.7 trillion in 2022.",
+    crisis: { then: "Began buying agency MBS in late 2008 (QE1) to rescue the market.", now: "Shrinking its MBS holdings; aims to hold mostly Treasuries over time." } },
+  { id: "banks", label: "Banks", role: "deposit-funded buyers", name: "JPMorgan Chase, Bank of America, Truist (the bank investors)", lane: 5, row: 1, views: AN,
+    does: "Buy agency MBS with deposits because they're safe, liquid and treated well by capital rules.", like: "A saver parking cash in a safe bond.", paid: "MBS interest above what they pay depositors.", incent: "Yield with low capital charges.", risks: "Interest rate risk: Silicon Valley Bank's 2023 failure showed what happens when long bonds lose value and deposits flee.", examples: "Large US banks are among the biggest agency MBS holders (approx.)." },
+  { id: "managers", label: "Money managers", role: "PIMCO, BlackRock", name: "PIMCO, BlackRock, Vanguard (the money managers)", lane: 5, row: 2, views: ["agency", "nonagency"],
+    does: "Buy MBS for mutual funds, ETFs and pensions; actively trade TBAs, dollar rolls and specified pools; buy senior private-label tranches.", like: "A professional shopper buying for millions of savers.", paid: "Management fees from their funds; their clients earn the MBS yield.", incent: "Beat the bond index (MBS are roughly a quarter of the main US bond index, approx.).", risks: "Prepayment, rate and spread risk.", examples: "PIMCO, BlackRock, Vanguard, Fidelity, Wellington." },
+  { id: "foreign", label: "Foreign investors", role: "central banks & funds", name: "Foreign central banks and investors (the overseas buyers)", lane: 5, row: 3, views: A,
+    does: "Buy agency MBS as a high-quality dollar asset that yields more than Treasuries.", like: "Overseas savers buying US 'safe' bonds.", paid: "MBS interest.", incent: "Safe dollar yield.", risks: "Currency and rate risk.", examples: "Investors in Japan, Taiwan and China are among large foreign holders (approx.)." },
+  { id: "reits", label: "Mortgage REITs", role: "Annaly, AGNC", name: "Annaly, AGNC (the mortgage REITs)", lane: 5, row: 4, views: ["agency", "servicing"],
+    does: "Real estate investment trusts, REITs (bond funds traded as stocks) buy agency MBS with borrowed money (repo), earn the gap between MBS yields and borrowing costs, and pay most of it out as dividends.", like: "Borrowing at the bank to buy a higher-paying bond.", paid: "Net interest spread, multiplied by leverage.", incent: "Big spreads and cheap funding.", risks: "Liquidity risk: margin calls when MBS prices drop (sharp in March 2020).", examples: "Annaly Capital Management, AGNC Investment." },
+  { id: "creditinv", label: "Credit investors", role: "hedge funds, insurers", name: "Hedge funds, insurers, reinsurers (the credit investors)", lane: 5, row: 5, views: ["nonagency", "crt"],
+    does: "Buy the riskier slices: CAS and STACR notes, CIRT and ACIS reinsurance, and junior private-label tranches.", like: "Underwriters who get paid well to absorb losses.", paid: "High floating coupons or insurance premiums.", incent: "Yield for credit risk they believe is overpriced.", risks: "Credit losses if housing turns.", examples: "Hedge funds, insurance companies and global reinsurers." },
+];
+export const P: Record<string, Player> = Object.fromEntries(PLAYERS.map((p) => [p.id, p]));
+
+export type Flow = { from: string; to: string; label: string; kind: FlowKind; views: View[] };
+const f = (from: string, to: string, label: string, kind: FlowKind, views: View[]): Flow => ({ from, to, label, kind, views });
+export const FLOWS: Flow[] = [
+  f("borrower", "broker", "applies through", "info", AN),
+  f("broker", "uwm", "brings the borrower", "info", AN),
+  f("uwm", "broker", "broker fee", "fee", AN),
+  f("uwm", "borrower", "funds the loan", "cash", AN),
+  f("rocket", "borrower", "lends the money", "cash", ANS),
+  f("borrower", "rocket", "points + fees", "fee", AN),
+  f("wells", "borrower", "bank loan", "cash", AN),
+  f("smalllender", "borrower", "local loan", "cash", A),
+  f("warehouse", "rocket", "funds closings", "cash", AN),
+  f("rocket", "warehouse", "repays + interest", "fee", AN),
+  f("fhlb", "smalllender", "cheap advances", "cash", A),
+  f("smalllender", "pennymac", "sells loans", "asset", A),
+  f("pennymac", "smalllender", "cash for loans", "cash", A),
+  f("borrower", "appraiser", "appraisal fee", "fee", AN),
+  f("borrower", "title", "title premium", "fee", AN),
+  f("rocket", "bureaus", "credit report fees", "fee", AN),
+  f("rocket", "mers", "registers the lien", "info", ALL4),
+  f("rocket", "custodian", "original note", "info", ALL4),
+  f("rocket", "fannie", "swaps loans", "asset", A),
+  f("fannie", "rocket", "MBS back", "asset", A),
+  f("smalllender", "fannie", "cash window sale", "asset", A),
+  f("fannie", "smalllender", "cash", "cash", A),
+  f("uwm", "freddie", "delivers loans", "asset", A),
+  f("fannie", "agencytrust", "pools into UMBS", "asset", ["agency", "crt"]),
+  f("freddie", "agencytrust", "pools into UMBS", "asset", A),
+  f("pennymac", "agencytrust", "issues Ginnie pool", "asset", A),
+  f("ginnie", "agencytrust", "full faith guarantee", "risk", A),
+  f("fha", "pennymac", "insures FHA/VA loans", "risk", A),
+  f("servicer", "fannie", "g-fee", "fee", ["agency", "servicing"]),
+  f("servicer", "ginnie", "guaranty fee", "fee", A),
+  f("fannie", "treasury", "TCCA 0.10% fee", "fee", A),
+  f("treasury", "fannie", "PSPA backstop", "risk", A),
+  f("fhfa", "fannie", "regulates, conservator", "info", ["agency", "crt"]),
+  f("fhfa", "freddie", "regulates", "info", A),
+  f("rocket", "tba", "sells forward", "asset", A),
+  f("tba", "dealers", "matched by", "info", A),
+  f("dealers", "rocket", "cash at settlement", "cash", A),
+  f("dealers", "ficc", "clears trades", "info", A),
+  f("ficc", "fedwire", "settles", "info", A),
+  f("dealers", "managers", "sells MBS", "asset", AN),
+  f("managers", "dealers", "cash for bonds", "cash", AN),
+  f("dealers", "reits", "repo loans", "cash", A),
+  f("reits", "dealers", "repo interest", "fee", A),
+  f("dealers", "fed", "QE sales (past)", "asset", A),
+  f("agencytrust", "managers", "monthly P&I", "pay", A),
+  f("agencytrust", "banks", "monthly P&I", "pay", A),
+  f("agencytrust", "fed", "paydowns (QT)", "pay", A),
+  f("agencytrust", "foreign", "monthly P&I", "pay", A),
+  f("agencytrust", "reits", "monthly P&I", "pay", A),
+  f("borrower", "servicer", "monthly payment", "pay", ANS),
+  f("servicer", "agencytrust", "P&I minus fees", "pay", ["agency", "servicing"]),
+  f("servicer", "escrow", "taxes + insurance", "pay", S),
+  f("servicer", "msrowner", "fee strip", "fee", S),
+  f("rocket", "msrowner", "sells the MSR", "asset", S),
+  f("msrowner", "rocket", "cash for MSR", "cash", S),
+  f("msrowner", "subservicer", "per-loan fee", "fee", S),
+  f("subservicer", "servicer", "does the work for", "info", S),
+  f("servicer", "mers", "updates records", "info", S),
+  f("reits", "msrowner", "buys MSRs", "cash", S),
+  f("warehouse", "plsissuer", "funding line", "cash", N),
+  f("wells", "plsissuer", "sells jumbo loans", "asset", N),
+  f("plsissuer", "depositor", "sells loans", "asset", N),
+  f("depositor", "plstrust", "true sale", "asset", N),
+  f("plstrust", "dealers", "issues tranches", "asset", N),
+  f("plsissuer", "raters", "rating fees", "fee", N),
+  f("raters", "plstrust", "grades tranches", "info", N),
+  f("trustee", "plstrust", "holds for bondholders", "info", N),
+  f("servicer", "plstrust", "collections", "pay", N),
+  f("plstrust", "managers", "senior payments", "pay", N),
+  f("plstrust", "creditinv", "junior payments", "pay", N),
+  f("plstrust", "plsissuer", "5% retained slice", "risk", N),
+  f("monolines", "plstrust", "wrapped bonds (pre-2008)", "risk", N),
+  f("fannie", "cas", "issues CAS", "asset", C),
+  f("freddie", "cas", "issues STACR", "asset", C),
+  f("creditinv", "cas", "cash for notes", "cash", C),
+  f("cas", "creditinv", "SOFR + spread", "pay", C),
+  f("cas", "fannie", "absorbs credit losses", "risk", C),
+  f("mi", "fannie", "covers first loss", "risk", ["agency", "crt"]),
+  f("borrower", "mi", "PMI premium", "fee", ["agency", "crt"]),
+  f("fannie", "creditinv", "CIRT premiums", "fee", C),
+  f("fhfa", "cas", "sets CRT goals", "info", C),
+];
+
+// ---------- ownership timelines ----------
+export type OwnStep = { t: string; d: string; loan: string; sec: string; own: Record<string, OwnKind[]> };
+export type AgencyPath = "swap" | "cash" | "ginnie";
+export type PathKey = AgencyPath | "nonagency" | "crt" | "servicing";
+export const PATH_LABEL: Record<PathKey, string> = { swap: "Fannie Mae swap (lender gets MBS)", cash: "Cash window (lender gets cash)", ginnie: "Ginnie Mae (FHA/VA loans)", nonagency: "Private-label (non-agency)", crt: "Credit risk transfer, CRT", servicing: "Servicing rights, MSR" };
+export const pathFor = (v: ViewSel, agencyPath: AgencyPath): PathKey => (v === "all" || v === "agency" ? agencyPath : v);
+const rec = (): Record<string, OwnKind[]> => ({ mers: ["cash"], custodian: ["cash"] });
+const inv = (): Record<string, OwnKind[]> => ({ managers: ["sec"], banks: ["sec"], fed: ["sec"], foreign: ["sec"], reits: ["sec"] });
+
+export const TIMELINES: Record<PathKey, OwnStep[]> = {
+  swap: [
+    { t: "Closing day: the borrower signs", d: "The borrower signs the promissory note (the IOU) and the mortgage (the lien on the house). Rocket Mortgage (the retail lender) funds it with cash borrowed from a warehouse lender (the short-term funder), so Rocket owns the loan while the warehouse lender only holds it as collateral. MERS (the lien registry) is recorded as the lender's nominee in county records, and a document custodian (the note vault) holds the original note. The borrower owns the house; the lender owns the IOU.", loan: "Rocket Mortgage (the retail lender)", sec: "No bond exists yet", own: { rocket: ["loan", "msr"], warehouse: ["cash"], title: ["cash"], ...rec() } },
+    { t: "The swap: loans go into a Fannie Mae MBS trust", d: "Rocket Mortgage delivers a batch of similar loans to Fannie Mae (the agency guarantor). Fannie Mae places them in an MBS trust and hands Rocket an equal amount of UMBS, Uniform MBS (the bond) in return. Legal ownership of the loans moves to the trust, which holds them for whoever owns the bond. Fannie Mae now carries only the credit risk through its guarantee. Rocket keeps the servicing rights.", loan: "The Fannie Mae MBS trust (the walled-off box)", sec: "Rocket Mortgage (the retail lender), for a few days", own: { agencytrust: ["loan"], fannie: ["risk"], rocket: ["sec", "msr"], ...rec() } },
+    { t: "Settlement: Rocket delivers the MBS it sold forward", d: "Weeks earlier, when the borrower locked the rate, Rocket Mortgage sold a matching TBA (to-be-announced forward) trade to a dealer such as JPMorgan (the market maker). Now it delivers the actual UMBS. FICC (the clearinghouse) has netted and guaranteed the trade, and ownership of the bond moves on Fedwire (the settlement rails) against cash. Rocket repays its warehouse line.", loan: "The Fannie Mae MBS trust (unchanged)", sec: "A dealer such as JPMorgan (the market maker), briefly", own: { agencytrust: ["loan"], fannie: ["risk"], dealers: ["sec"], rocket: ["msr"], ficc: ["cash"], fedwire: ["cash"], ...rec() } },
+    { t: "Investors own the bond", d: "The dealer sells the bonds on to investors: PIMCO and BlackRock (the money managers), banks, Annaly and AGNC (the mortgage REITs), foreign central banks and, in QE years, the Federal Reserve. They own a share of the trust's cash flows. They do not own any individual loan and can't foreclose on anyone.", loan: "The Fannie Mae MBS trust (unchanged)", sec: "Investors: money managers, banks, REITs, foreign buyers, the Fed", own: { agencytrust: ["loan"], fannie: ["risk"], ...inv(), rocket: ["msr"], dealers: ["cash"], ...rec() } },
+    { t: "Every month for years: collect and pass through", d: "The borrower pays Mr. Cooper or Rocket (the servicer). The servicer keeps its 0.25% fee strip, sends the g-fee (insurance premium) to Fannie Mae, and passes principal and interest to the trust, which pays bondholders. If the borrower falls about 4 months behind, Fannie Mae typically buys that loan out of the trust, so Fannie Mae owns that one loan, and bondholders are repaid at full value.", loan: "The Fannie Mae MBS trust (or Fannie Mae, for a bought-out problem loan)", sec: "Investors", own: { agencytrust: ["loan"], fannie: ["risk"], ...inv(), servicer: ["msr"], ...rec() } },
+    { t: "The end: paid off or refinanced", d: "The borrower sells or refinances. The payoff passes through the trust to bondholders as a prepayment (early return of principal). The lien is released, MERS (the registry) closes its record and the custodian releases the note marked paid. The bond shrinks; the servicing fee stops.", loan: "Nobody: the IOU is paid and cancelled", sec: "Investors (holding a smaller bond)", own: { ...inv(), ...rec() } },
+  ],
+  cash: [
+    { t: "Closing day at a community lender", d: "A local bank or credit union (the small lender) makes the loan with its own cash. It owns the note; MERS (the lien registry) and a custodian (the note vault) record and hold the paperwork.", loan: "Community bank or credit union (the small lender)", sec: "No bond exists yet", own: { smalllender: ["loan", "msr"], title: ["cash"], ...rec() } },
+    { t: "Cash window: Fannie Mae buys the loan for cash", d: "The lender sells the single loan to Fannie Mae (the agency guarantor) through its cash window and gets cash back to make the next loan. Now Fannie Mae owns the loan outright, on its own books, for a short time. The lender can keep the servicing rights or sell them along with the loan.", loan: "Fannie Mae (the agency guarantor), on its own books", sec: "No bond yet", own: { fannie: ["loan", "risk"], smalllender: ["msr"], ...rec() } },
+    { t: "Fannie Mae pools many lenders' loans", d: "Fannie Mae groups cash-window loans from many lenders into one multilender UMBS pool. The loans move into an MBS trust; Fannie Mae holds the new bond first and keeps the credit risk through its guarantee.", loan: "The Fannie Mae MBS trust", sec: "Fannie Mae (the agency guarantor), briefly", own: { agencytrust: ["loan"], fannie: ["sec", "risk"], smalllender: ["msr"], ...rec() } },
+    { t: "Fannie Mae sells the bond through dealers", d: "Fannie Mae's capital markets desk sells the UMBS through dealers such as Goldman Sachs (the market maker) in the TBA market. Investors end up owning it.", loan: "The Fannie Mae MBS trust", sec: "Investors: money managers, banks, REITs, foreign buyers", own: { agencytrust: ["loan"], fannie: ["risk"], ...inv(), dealers: ["cash"], smalllender: ["msr"], ...rec() } },
+    { t: "Every month: the servicer passes cash through", d: "Whoever holds the servicing rights collects payments, keeps the fee strip, sends the g-fee to Fannie Mae and the rest to bondholders.", loan: "The Fannie Mae MBS trust", sec: "Investors", own: { agencytrust: ["loan"], fannie: ["risk"], ...inv(), servicer: ["msr"], ...rec() } },
+  ],
+  ginnie: [
+    { t: "Closing: an FHA loan with a government insurer", d: "PennyMac (the lender and Ginnie issuer) makes a 3.5%-down FHA loan. FHA (the government insurer) insures most of the loss if it defaults. PennyMac owns the loan.", loan: "PennyMac (the lender and Ginnie issuer)", sec: "No bond exists yet", own: { pennymac: ["loan", "msr"], fha: ["risk"], warehouse: ["cash"], ...rec() } },
+    { t: "PennyMac issues a Ginnie Mae MBS", d: "Unlike Fannie Mae, Ginnie Mae (the government guarantor) never buys the loans. PennyMac, as the approved issuer, pools them; the loans are assigned to the pool for the MBS holders and the document custodian holds the notes. Ginnie Mae adds the full faith and credit guarantee of the United States.", loan: "The Ginnie Mae pool, held for MBS holders (the walled-off box)", sec: "PennyMac (the issuer), briefly", own: { agencytrust: ["loan"], pennymac: ["sec", "msr"], ginnie: ["risk"], fha: ["risk"], ...rec() } },
+    { t: "Investors own the Ginnie MBS", d: "PennyMac sells the bonds through dealers. Banks, foreign central banks and money managers like Ginnie MBS because they carry the US government's own guarantee.", loan: "The Ginnie Mae pool", sec: "Investors: banks, foreign buyers, money managers", own: { agencytrust: ["loan"], ginnie: ["risk"], fha: ["risk"], ...inv(), pennymac: ["msr"], ...rec() } },
+    { t: "Missed payments: advance, then buy the loan out", d: "If the borrower misses payments, PennyMac must advance its own cash to bondholders (a liquidity drain). Once the loan is about 90 days delinquent it may buy the loan out of the pool at full value, so PennyMac owns that loan again while it works out a modification or files the FHA claim.", loan: "The Ginnie pool, or PennyMac (the issuer) for a bought-out loan", sec: "Investors", own: { agencytrust: ["loan"], pennymac: ["loan", "msr"], ginnie: ["risk"], fha: ["risk"], ...inv(), ...rec() } },
+  ],
+  nonagency: [
+    { t: "A jumbo or non-QM loan is made", d: "Wells Fargo (the bank lender) or a non-QM lender makes a loan Fannie Mae can't take: too big (jumbo) or with non-traditional income proof (non-QM). A sponsor such as Redwood Trust or Angel Oak (the private-label sponsor) buys and collects hundreds of these with warehouse funding.", loan: "The sponsor, e.g. Redwood Trust or Angel Oak (the private-label sponsor)", sec: "No bond exists yet", own: { plsissuer: ["loan"], warehouse: ["cash"], ...rec() } },
+    { t: "Sponsor sells to the depositor", d: "The sponsor sells the loans to its depositor (the pass-through company), a shell it owns. This first hop sets up a clean true sale (a real sale).", loan: "The depositor (the pass-through company), for a moment", sec: "No bond yet", own: { depositor: ["loan"], ...rec() } },
+    { t: "Depositor sells to the SPV trust", d: "The depositor immediately sells the loans to the trust, the special purpose vehicle, SPV (the walled-off box). The trust owns the loans; U.S. Bank or Wilmington Trust (the trustee) holds them for the bondholders, and the custodian keeps the notes. If the sponsor goes bankrupt, its creditors can't touch the loans.", loan: "The private-label trust, SPV (held by the trustee for bondholders)", sec: "Being created", own: { plstrust: ["loan"], trustee: ["cash"], raters: ["cash"], ...rec() } },
+    { t: "The trust issues tranches; investors buy them", d: "The trust issues tranches (floors of risk) graded by Moody's, S&P, Fitch or KBRA (the rating agencies). Money managers buy the AAA senior bonds; hedge funds and insurers (the credit investors) buy the junior ones. The sponsor keeps 5% of the risk (risk retention). Nobody guarantees these bonds: bondholders own the credit risk themselves.", loan: "The private-label trust, SPV", sec: "Investors by tranche; the sponsor keeps 5%", own: { plstrust: ["loan"], trustee: ["cash"], managers: ["sec"], creditinv: ["sec", "risk"], plsissuer: ["sec", "risk"], dealers: ["cash"], ...rec() } },
+    { t: "Monthly: servicer collects, waterfall pays seniors first", d: "The servicer (payment collector) keeps its fee and passes collections to the trust; the trustee pays the tranches in the waterfall (payment order): seniors are paid first and losses hit the bottom tranche first.", loan: "The private-label trust, SPV", sec: "Investors by tranche", own: { plstrust: ["loan"], trustee: ["cash"], managers: ["sec"], creditinv: ["sec", "risk"], plsissuer: ["sec", "risk"], servicer: ["msr"], ...rec() } },
+  ],
+  crt: [
+    { t: "Start: loans already sit in a Fannie Mae trust", d: "Thousands of loans have been swapped into UMBS. The trust owns the loans, investors own the MBS, and Fannie Mae (the agency guarantor) owns the credit risk via its guarantee.", loan: "The Fannie Mae MBS trust", sec: "MBS investors", own: { agencytrust: ["loan"], fannie: ["risk"], managers: ["sec"], banks: ["sec"] } },
+    { t: "Mortgage insurers take a slice on low-down-payment loans", d: "For loans with less than 20% down, MGIC, Radian, Essent or Arch MI (the private mortgage insurers) cover a top slice of each loan's loss. They own risk, not loans.", loan: "The Fannie Mae MBS trust (unchanged)", sec: "MBS investors (unchanged)", own: { agencytrust: ["loan"], fannie: ["risk"], mi: ["risk"], managers: ["sec"], banks: ["sec"] } },
+    { t: "Fannie Mae sells CAS notes on a reference pool", d: "Fannie Mae issues Connecticut Avenue Securities, CAS (credit risk bonds) tied to a reference pool (a list of loans, not the loans themselves). Freddie Mac does the same with STACR. Credit investors pay cash up front and receive SOFR plus a spread.", loan: "Still the Fannie Mae MBS trust: nothing moved", sec: "MBS investors own the MBS; CAS investors own CAS notes", own: { agencytrust: ["loan"], fannie: ["risk"], cas: ["risk"], creditinv: ["risk"], mi: ["risk"], managers: ["sec"], banks: ["sec"] } },
+    { t: "Loans default: who actually loses?", d: "MBS investors are paid in full by Fannie Mae's guarantee. Mortgage insurers pay their slice. Beyond a small first-loss piece Fannie Mae keeps, losses are written off CAS note principal, so credit investors lose money. The loans never moved: CAS and STACR investors own only the risk.", loan: "The Fannie Mae MBS trust (defaulted loans get bought out by Fannie Mae)", sec: "MBS investors: unaffected", own: { agencytrust: ["loan"], fannie: ["loan", "risk"], cas: ["risk"], creditinv: ["risk"], mi: ["risk"], managers: ["sec"], banks: ["sec"] } },
+  ],
+  servicing: [
+    { t: "Day one: the lender owns everything", d: "Right after closing, Rocket Mortgage (the retail lender) owns the loan and the right to service it.", loan: "Rocket Mortgage (the retail lender)", sec: "No bond yet", own: { rocket: ["loan", "msr"], ...rec() } },
+    { t: "The loan is sold; the servicing right splits off", d: "When the loan goes into a Fannie Mae trust, Rocket gives up the loan but keeps a mortgage servicing right, MSR (the right to collect the fee). The MSR is a separate asset on Rocket's books, often valued at a few times the yearly fee (example).", loan: "The Fannie Mae MBS trust", sec: "MBS investors", own: { agencytrust: ["loan"], rocket: ["msr"], fannie: ["risk"], managers: ["sec"], ...rec() } },
+    { t: "The MSR is sold to an investor", d: "Rocket sells the MSR to Rithm Capital or Annaly (the MSR investors) for cash, with Fannie Mae's approval. The borrower gets a letter saying their servicer is changing. The loan's owner (the trust) doesn't change.", loan: "The Fannie Mae MBS trust (unchanged)", sec: "MBS investors (unchanged)", own: { agencytrust: ["loan"], msrowner: ["msr"], fannie: ["risk"], managers: ["sec"], ...rec() } },
+    { t: "A subservicer is hired to do the work", d: "The MSR owner hires Cenlar or Dovenmuehle (the subservicers) to run call centers and payments for a flat monthly fee per loan. The subservicer handles cash but owns nothing.", loan: "The Fannie Mae MBS trust", sec: "MBS investors", own: { agencytrust: ["loan"], msrowner: ["msr"], subservicer: ["cash"], servicer: ["cash"], fannie: ["risk"], managers: ["sec"], ...rec() } },
+    { t: "Escrow: the borrower's money, held for them", d: "Each month part of the payment goes to an escrow account for taxes and home insurance. That money belongs to the borrower; the servicer just holds and pays it (and may earn interest float on it).", loan: "The Fannie Mae MBS trust", sec: "MBS investors", own: { agencytrust: ["loan"], msrowner: ["msr"], subservicer: ["cash"], servicer: ["cash"], escrow: ["cash"], managers: ["sec"], ...rec() } },
+    { t: "Trouble: advances and buyouts", d: "If the borrower stops paying, the servicer advances missed interest to bondholders from its own cash for up to about 4 months. Then Fannie Mae typically buys the loan out of the trust, so Fannie Mae owns that loan directly while the servicer works on a modification or, as a last resort, foreclosure.", loan: "Fannie Mae (the agency guarantor), for the bought-out loan", sec: "MBS investors (repaid at full value for that loan)", own: { fannie: ["loan", "risk"], msrowner: ["msr"], servicer: ["cash"], managers: ["sec"], ...rec() } },
+  ],
+};
+
+// ---------- risk overlay ----------
+export const RISK_BEARERS: Record<RiskKey, Record<string, string>> = {
+  credit: { fannie: "Guarantees agency MBS: pays bondholders even when borrowers don't.", freddie: "Same guarantee as Fannie Mae.", ginnie: "Backs the issuer if it fails, with the government's guarantee.", fha: "FHA insures most of each loss; VA guarantees part of each VA loan.", mi: "Pays the first slice of loss on low-down-payment loans.", cas: "Principal is written down when reference-pool loans default.", creditinv: "Own junior tranches and CRT notes: they take the losses.", plsissuer: "Keeps 5% of the risk (risk retention).", treasury: "Ultimate backstop for Fannie Mae and Freddie Mac.", borrower: "Loses their down payment (equity) first if prices fall.", monolines: "Historically insured bonds; overwhelmed in 2008." },
+  prepay: { managers: "Get principal back early when rates fall, then reinvest at lower rates.", banks: "Same for bank MBS portfolios.", reits: "Prepayments shrink their best-yielding bonds.", foreign: "Same as other MBS holders.", fed: "Paydowns shrink its balance sheet (that's how QT works).", msrowner: "A refi ends the fee strip: MSRs lose value when rates fall.", servicer: "Same as MSR owners when it owns the rights.", cas: "Faster payoffs shorten CRT notes (the reference pool shrinks)." },
+  rate: { banks: "Fixed-rate MBS lose value when rates rise (Silicon Valley Bank, 2023).", managers: "Bond funds fall in value when rates rise.", reits: "Rising rates hurt both their bonds and their borrowing costs.", fed: "Paper losses when rates rise, though it needn't sell.", rocket: "Pipeline risk between rate lock and sale; hedged with TBA sales.", uwm: "Same pipeline risk.", pennymac: "Same pipeline risk, plus MSR value swings.", msrowner: "MSRs gain value when rates rise (fewer refis): a natural hedge for lenders.", foreign: "Same as other bond holders.", dealers: "Inventory gains or losses between trades." },
+  liquidity: { reits: "Repo margin calls when MBS prices drop (March 2020).", servicer: "Must advance missed payments from its own cash.", pennymac: "Ginnie issuers advance for longer: a big cash drain in downturns.", rocket: "Depends on warehouse lines to fund closings.", warehouse: "Exposed if a lender fails before loans are sold.", creditinv: "Junior bonds and CRT notes are harder to sell in a panic.", dealers: "Limited balance sheet to absorb sellers in a crisis.", smalllender: "Small balance sheets need quick sales; FHLBank advances help." },
+};
+
+// ---------- 2008 then vs now ----------
+export const CRISIS: { area: string; then: string; broke: string; now: string }[] = [
+  { area: "Making loans", then: "No-doc 'liar loans', teaser-rate ARMs (adjustable-rate mortgages) and 100% financing.", broke: "Borrowers couldn't afford the reset payments; defaults spread as prices fell.", now: "Ability-to-Repay and Qualified Mortgage, ATR/QM rules (prove you can afford it), enforced by the CFPB (the consumer finance regulator) since 2014." },
+  { area: "Private-label bonds", then: "Approx. $2 trillion+ of private-label RMBS outstanding at the 2007 peak, much of it subprime and Alt-A.", broke: "Even AAA tranches took losses; trading froze.", now: "5% risk retention (skin in the game) under Dodd-Frank, better loan data; a much smaller market, mostly prime jumbo and non-QM." },
+  { area: "Ratings", then: "Issuers paid for ratings and could shop for the best one.", broke: "Mass downgrades of AAA bonds in 2007 and 2008.", now: "SEC Office of Credit Ratings and method disclosure; issuer-pays remains." },
+  { area: "Fannie Mae & Freddie Mac", then: "Thin capital, an assumed (implicit) government guarantee, big investment portfolios.", broke: "Losses led to conservatorship (a court-style caretaker) in September 2008.", now: "FHFA (the conservator), Treasury's PSPA backstop, CRT programs, smaller portfolios, capital rules." },
+  { area: "Bond insurers", then: "MBIA and Ambac (the bond insurers) wrapped mortgage bonds and CDOs.", broke: "Downgraded; their wraps lost most of their value.", now: "Rarely used in mortgage deals." },
+  { area: "Servicing", then: "Servicers built for collecting payments, not mass loss mitigation.", broke: "Robo-signing and lost paperwork (2010 foreclosure crisis).", now: "CFPB servicing rules: early outreach, loss mitigation before foreclosure." },
+  { area: "Funding & the Fed", then: "Lenders and investors leaned on short-term funding.", broke: "Funding dried up; Countrywide (then the largest lender) was bought by Bank of America in 2008.", now: "The Fed has shown it will buy agency MBS in a crisis (2008, 2020); stricter bank liquidity rules (Basel III)." },
+];
+
+// ---------- glossary: key -> [official term, analogy, plain explanation] ----------
+export const G: Record<string, [string, string, string]> = {
+  mbs: ["Mortgage-backed security, MBS", "a bond made of mortgages", "A bond whose payments come from a pool of home loans. Each month homeowners' payments flow through to bondholders."],
+  secondary: ["Secondary mortgage market", "the resale market for loans", "Where lenders sell the loans they've made so they get cash back to lend again. Fannie Mae, Freddie Mac, Ginnie Mae pools and private investors are the buyers."],
+  note: ["Promissory note", "the IOU", "The borrower's signed promise to repay. Whoever owns the note owns the loan."],
+  lien: ["Mortgage or deed of trust", "the lien on the house", "The document that lets the note owner take the house if the loan isn't paid. It's recorded in county records."],
+  gse: ["Government-sponsored enterprise, GSE", "a private company with a public mission", "Fannie Mae and Freddie Mac: shareholder-owned companies chartered by Congress to keep mortgage money flowing. In conservatorship since 2008."],
+  conservatorship: ["Conservatorship", "a court-style caretaker", "FHFA has run Fannie Mae and Freddie Mac since September 2008 to stabilize them."],
+  agency: ["Agency MBS", "government-backed mortgage bonds", "MBS guaranteed by Fannie Mae, Freddie Mac or Ginnie Mae. Investors take no credit risk, only rate and prepayment risk."],
+  umbs: ["Uniform MBS, UMBS", "one shared bond", "Since June 2019 Fannie Mae and Freddie Mac issue the same standardized bond so they trade as one market."],
+  gfee: ["Guarantee fee, g-fee", "insurance premium", "A yearly fee (approx. 0.5% to 0.65% of the loan balance) Fannie Mae or Freddie Mac takes out of the borrower's interest for guaranteeing bondholders get paid."],
+  llpa: ["Loan-level price adjustment, LLPA", "a risk surcharge", "An upfront fee set by Fannie Mae and Freddie Mac based on credit score, down payment and loan type. Usually built into the borrower's rate."],
+  cashwindow: ["Cash window", "selling for cash", "A lender sells individual loans to Fannie Mae or Freddie Mac for cash. Popular with smaller lenders."],
+  swap: ["Lender swap", "trade loans for bonds", "A lender hands a batch of loans to Fannie Mae or Freddie Mac and gets back MBS backed by those same loans, which it then sells."],
+  tba: ["To-be-announced market, TBA", "a forward order for generic bonds", "Buyers and sellers agree today on price, coupon and month for agency MBS; the exact pools are announced 48 hours before settlement."],
+  dollarroll: ["Dollar roll", "lending your bond for a month", "Selling a TBA for this month and buying it back for next month: a cheap way to finance MBS."],
+  specpool: ["Specified pool", "a hand-picked bond", "An MBS pool sold by its exact identity, for a premium, because its loans tend to prepay slowly (e.g. small loan sizes)."],
+  qe: ["Quantitative easing, QE", "the Fed buying bonds", "The Fed creates money to buy Treasuries and agency MBS, pushing mortgage rates down."],
+  qt: ["Quantitative tightening, QT", "letting the Fed's bonds shrink", "The Fed stops replacing bonds as they pay down, shrinking its holdings."],
+  servicer: ["Servicer", "payment collector", "The company that collects payments, runs escrow and handles borrowers who fall behind. It doesn't own the loan."],
+  msr: ["Mortgage servicing right, MSR", "the right to collect the fee", "A separate asset: the right to service a loan and keep the fee strip, often approx. 0.25% a year, for as long as the loan lives."],
+  feestrip: ["Servicing fee strip", "the collector's cut", "The slice of each interest payment the servicer keeps, e.g. 0.25% a year of the balance."],
+  escrow: ["Escrow account", "a savings jar for tax and insurance", "Part of the monthly payment the servicer holds to pay property tax and homeowners insurance. The money belongs to the borrower."],
+  advance: ["Servicer advance", "paying for the borrower", "When a borrower misses a payment, the servicer often has to pay bondholders from its own pocket and gets reimbursed later."],
+  subservicer: ["Subservicer", "hired payment collector", "A company that does servicing work under contract for the MSR owner."],
+  pls: ["Private-label securities, PLS", "bonds with no government stamp", "Non-agency MBS issued by private firms; investors take the credit risk. Also called non-agency RMBS."],
+  rmbs: ["Residential MBS, RMBS", "home-loan bonds", "MBS backed by home loans (as opposed to commercial property loans)."],
+  jumbo: ["Jumbo loan", "too big for Fannie", "A loan above the conforming loan limit (approx. $806,500 in most areas for 2025), so Fannie Mae and Freddie Mac can't buy it."],
+  nonqm: ["Non-QM loan", "outside the standard box", "A loan that doesn't meet the Qualified Mortgage definition, e.g. self-employed borrowers proving income with bank statements. Lenders must still check ability to repay."],
+  qm: ["Qualified Mortgage, QM / Ability-to-Repay, ATR", "the safe-loan rulebook", "Post-2008 rules: lenders must verify a borrower can afford the loan; QM loans meet extra standards and give lenders legal protection."],
+  spv: ["Special purpose vehicle, SPV", "walled-off box", "A legal entity created only to hold the loans and issue bonds, separate from the sponsor's other business."],
+  truesale: ["True sale", "a real sale", "A sale that legally moves loans out of the seller's hands, so the seller's creditors can't claw them back."],
+  depositor: ["Depositor", "the pass-through company", "A shell owned by the sponsor that buys the loans and resells them to the trust, making the true sale clean."],
+  trustee: ["Trustee", "the bondholders' referee", "Holds the trust's assets for bondholders and enforces the deal's rules."],
+  tranche: ["Tranche", "a floor of the building", "A slice of a bond deal with its own risk and priority. Senior tranches are paid first; junior ones absorb losses first."],
+  waterfall: ["Waterfall", "the payment order", "The rule for who gets paid first each month and who absorbs losses first."],
+  ce: ["Credit enhancement", "safety cushion", "Protection for senior bonds, such as junior tranches below them, extra collateral or insurance."],
+  riskretention: ["Risk retention", "skin in the game", "Dodd-Frank rule that sponsors of private-label deals keep 5% of the credit risk."],
+  rating: ["Credit rating", "grade", "A letter grade from AAA (safest) down, given by agencies such as Moody's, S&P, Fitch and KBRA."],
+  crt: ["Credit risk transfer, CRT", "sharing the insurance risk", "Fannie Mae and Freddie Mac pay private investors to take some of the credit risk on loans they guarantee, without selling the loans."],
+  cas: ["Connecticut Avenue Securities, CAS", "Fannie Mae's credit risk bonds", "Notes whose principal is written down if loans in a reference pool default."],
+  stacr: ["Structured Agency Credit Risk, STACR", "Freddie Mac's credit risk bonds", "Freddie Mac's version of CAS."],
+  refpool: ["Reference pool", "a list of loans being tracked", "The loans whose performance a CRT note follows. Investors don't own these loans."],
+  pmi: ["Private mortgage insurance, PMI", "deductible cover for the lender", "Insurance a borrower with less than 20% down pays for; it covers part of the loss if they default."],
+  mers: ["Mortgage Electronic Registration Systems, MERS", "an electronic address book for mortgages", "A registry that tracks who owns and services each loan so county records don't have to change with every sale."],
+  custodian: ["Document custodian", "the note vault", "Holds the original signed notes for whoever owns the loans."],
+  warehouse: ["Warehouse line", "a pawn shop for new loans", "A short-term credit line that funds a non-bank lender's closings until the loans are sold."],
+  fhlb: ["Federal Home Loan Banks, FHLBanks", "the banks' bank", "Eleven cooperative banks that lend to member banks and insurers against mortgage collateral."],
+  ficc: ["Fixed Income Clearing Corporation, FICC", "the clearinghouse", "Part of DTCC; guarantees and nets MBS and Treasury trades between members."],
+  fedwire: ["Fedwire Securities Service", "the settlement rails", "The Fed's system that records who owns agency MBS and moves them against cash."],
+  pspa: ["Senior Preferred Stock Purchase Agreement, PSPA", "a standby credit line from Treasury", "Treasury's 2008 agreement to inject capital into Fannie Mae and Freddie Mac if needed, in exchange for senior preferred stock."],
+  prepay: ["Prepayment", "paying back early", "When a borrower refinances, sells or pays extra, principal returns to bondholders early."],
+  ltv: ["Loan-to-value, LTV", "loan as a share of the home price", "A $360,000 loan on a $400,000 home has a 90% LTV. Higher LTV means less cushion if prices fall."],
+  repo: ["Repurchase agreement, repo", "a collateralized loan", "Selling a bond today and agreeing to buy it back later at a slightly higher price: effectively borrowing against the bond."],
+  passthrough: ["Pass-through", "money in, money out", "A structure where payments from borrowers flow straight through to bondholders, minus fees."],
+  coupon: ["Coupon (pass-through rate)", "what the bond pays", "The interest rate the MBS pays investors: the loan rate minus the servicing fee and g-fee."],
+  mip: ["Mortgage insurance premium, MIP", "FHA's insurance charge", "FHA's upfront and annual premiums that fund its insurance on FHA loans."],
+};
+
+// ---------- quiz ----------
+export type Q = { q: string; opts: string[]; ok: number; why: string };
+export const QUIZ: Q[] = [
+  { q: "A loan sits in a Fannie Mae UMBS trust. Who legally owns the loan?", opts: ["The servicer", "The MBS trust, for bondholders", "PIMCO (the money manager)", "MERS (the lien registry)"], ok: 1, why: "The trust owns the loans and holds them for bondholders. Investors own the bond (a share of the cash flows), the servicer owns only the servicing rights, and MERS just keeps records." },
+  { q: "What does the guarantee fee, g-fee (insurance premium) pay for?", opts: ["The servicer's call center", "Fannie Mae or Freddie Mac promising bondholders get paid even if borrowers default", "The appraisal", "The Fed's bond buying"], ok: 1, why: "The g-fee comes out of the borrower's interest and pays the agency for taking the credit risk." },
+  { q: "CAS and STACR investors own...", opts: ["The loans", "The MBS", "Only the credit risk", "The servicing rights"], ok: 2, why: "Credit risk transfer moves risk, not ownership. The loans stay in the trust; CAS and STACR notes lose principal if reference-pool loans default." },
+  { q: "Why can a lender lock your rate 45 days before closing?", opts: ["The Fed guarantees it", "It sells the future MBS forward in the TBA market", "The appraiser approves it", "MERS freezes rates"], ok: 1, why: "The to-be-announced, TBA (forward) market lets lenders agree today on the price of bonds they'll deliver later." },
+  { q: "Which one does NOT buy loans, and only guarantees bonds that lenders issue?", opts: ["Fannie Mae", "Freddie Mac", "Ginnie Mae", "FHFA"], ok: 2, why: "Ginnie Mae (the government guarantor) adds the US government's guarantee to pools that approved issuers like PennyMac create." },
+  { q: "Rates fall and everyone refinances. Who is hurt most?", opts: ["MSR owners and MBS investors who wanted to keep the high-rate loans", "Borrowers", "Title insurers", "Fedwire"], ok: 0, why: "Prepayment risk: the servicing fee stops and bondholders get cash back to reinvest at lower rates." },
+  { q: "In a private-label deal, who absorbs credit losses first?", opts: ["The senior AAA tranche", "The junior tranche (bottom floor)", "Fannie Mae", "The trustee"], ok: 1, why: "There's no agency guarantee: the waterfall sends losses to the most junior tranche first." },
+  { q: "What did Dodd-Frank add to private-label securitization?", opts: ["5% risk retention (skin in the game)", "A ban on MBS", "Government guarantees", "Mandatory bond insurance"], ok: 0, why: "Sponsors must keep 5% of the credit risk unless the loans meet the Qualified Mortgage standard." },
+  { q: "The borrower's escrow money belongs to...", opts: ["The servicer", "The MBS investors", "The borrower", "Fannie Mae"], ok: 2, why: "The servicer just holds it to pay taxes and insurance on the borrower's behalf." },
+  { q: "Why were mortgage REITs like Annaly and AGNC under pressure in March 2020?", opts: ["Their loans defaulted", "Liquidity risk: repo margin calls as MBS prices swung", "MERS shut down", "Ginnie Mae stopped guaranteeing"], ok: 1, why: "They borrow against their MBS; when prices fell, lenders demanded more collateral fast." },
+];
+
+// ---------- market facts (approx.) ----------
+export const FACTS: { k: string; v: string; d: string }[] = [
+  { k: "US home mortgage debt", v: "approx. $13T", d: "outstanding, rounded" },
+  { k: "Agency MBS outstanding", v: "approx. $9T", d: "Fannie, Freddie, Ginnie" },
+  { k: "Agency MBS trading", v: "approx. $250B/day", d: "mostly TBA, rounded" },
+  { k: "Fed MBS peak", v: "approx. $2.7T", d: "in 2022, shrinking since" },
+  { k: "Conservatorship since", v: "Sept 2008", d: "Fannie Mae & Freddie Mac" },
+];

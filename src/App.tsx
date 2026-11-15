@@ -1,0 +1,230 @@
+import { useEffect, useLayoutEffect, useState } from "react";
+import type { CSSProperties, ReactNode } from "react";
+import { DISCLAIMER, FACTS, FLOW_KIND, OWN, P, PATH_LABEL, RISK, TIMELINES, VIEW_LABEL, VIEW_SHORT, pathFor } from "./data";
+import type { AgencyPath, OwnKind, PathKey, RiskKey, ViewSel, FlowKind } from "./data";
+import { MoneyMap } from "./map";
+import type { Overlay } from "./map";
+import { Panel, Seg, Switch, Term } from "./ui";
+import { CrisisPage, Glossary, OneDollar, OwnBadges, OwnLegend, PlayerCard, Quiz, RiskPage, namesOf } from "./pages";
+
+const ls = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } } };
+const PAGES: [string, string][] = [["Money map", "follow the money"], ["Who owns it?", "loan vs bond, step by step"], ["Follow one payment", "where your dollar goes"], ["Who takes which risk", "credit, prepay, rates, cash"], ["2008: then vs now", "what broke, what changed"], ["Glossary", "every term, in plain English"], ["Check yourself", "10-question quiz"]];
+const VIEW_EXPLAIN: Record<ViewSel, ReactNode> = {
+  all: <>Every player at once. Pick a view above to focus on one part of the market. Most US mortgages travel the <b>agency</b> route: lenders sell them to Fannie Mae or Freddie Mac (the agency guarantors), or pool them under Ginnie Mae (the government guarantor), and the loans become <Term k="mbs">mortgage-backed securities, MBS (bonds made of mortgages)</Term>.</>,
+  agency: <>The government-backed highway. Lenders swap or sell loans to Fannie Mae and Freddie Mac (the agency guarantors) or pool FHA and VA loans under Ginnie Mae (the government guarantor). The bonds trade in the <Term k="tba">TBA market (forward orders for generic bonds)</Term>, the guarantors earn a <Term k="gfee">guarantee fee, g-fee (insurance premium)</Term>, and investors take rate and prepayment risk but not credit risk.</>,
+  nonagency: <>Loans the agencies can't take, such as <Term k="jumbo">jumbo loans (too big for Fannie)</Term> and <Term k="nonqm">non-QM loans (outside the standard box)</Term>, go through a private <Term k="spv">special purpose vehicle, SPV (walled-off box)</Term>. Nobody guarantees the bonds, so <Term k="rating">credit ratings (grades)</Term>, <Term k="tranche">tranches (floors of the building)</Term> and <Term k="riskretention">risk retention (skin in the game)</Term> do the protecting.</>,
+  crt: <>Fannie Mae and Freddie Mac keep the loans in their trusts but pay outside investors to take part of the credit risk: <Term k="cas">CAS (Fannie's credit risk bonds)</Term>, <Term k="stacr">STACR (Freddie's)</Term>, insurance deals, and <Term k="pmi">private mortgage insurance, PMI (deductible cover)</Term>. Investors own risk, not loans.</>,
+  servicing: <>Someone has to collect every payment. The <Term k="servicer">servicer (payment collector)</Term> keeps a <Term k="feestrip">servicing fee strip (the collector's cut)</Term>; the right to that fee is an asset, the <Term k="msr">mortgage servicing right, MSR (the right to collect the fee)</Term>, which can be sold apart from the loan.</>,
+};
+
+export default function App() {
+  const [page, setPageRaw] = useState(() => Number(ls.get("mmm.page") ?? 0) || 0);
+  const setPage = (n: number) => { setPageRaw(n); ls.set("mmm.page", String(n)); document.querySelector(".main")?.scrollTo(0, 0); };
+  const [view, setViewRaw] = useState<ViewSel>("all");
+  const [apath, setApath] = useState<AgencyPath>("swap");
+  const [step, setStep] = useState(0);
+  const [overlay, setOverlay] = useState<Overlay>("money");
+  const [risk, setRisk] = useState<RiskKey>("credit");
+  const [crisis, setCrisis] = useState(false);
+  const [animate, setAnimate] = useState(true);
+  const [sel, setSel] = useState("borrower");
+  const [sideTab, setSideTab] = useState<"player" | "glossary">("player");
+  const [mtab, setMtab] = useState<"main" | "player" | "glossary">("main");
+  const [gq, setGq] = useState("");
+  const [quiz, setQuiz] = useState<Record<number, number>>({});
+  const [theme, setTheme] = useState(() => ls.get("mmm.theme") ?? "dark");
+  const [tour, setTour] = useState(() => (ls.get("mmm.tour.v1") ? -1 : 0));
+  const [hole, setHole] = useState<DOMRect | null>(null);
+  useEffect(() => { document.documentElement.setAttribute("data-theme", theme); ls.set("mmm.theme", theme); }, [theme]);
+
+  const setView = (v: ViewSel) => { setViewRaw(v); setStep(0); };
+  const path: PathKey = pathFor(view, apath);
+  const steps = TIMELINES[path];
+  const si = Math.min(step, steps.length - 1);
+  const st = steps[si];
+  const pickPath = (k: PathKey) => { if (k === "swap" || k === "cash" || k === "ginnie") { setApath(k); setViewRaw(view === "all" ? "all" : "agency"); } else setViewRaw(k); setStep(0); };
+  const pick = (id: string) => { setSel(id); setSideTab("player"); };
+  const prev = () => setStep(Math.max(0, si - 1)), next = () => setStep(Math.min(steps.length - 1, si + 1));
+
+  // ---------- tour ----------
+  const TOUR: { sel: string; title: string; body: string }[] = [
+    { sel: "", title: "Welcome to the Mortgage Money Map", body: "When you get a mortgage, your lender usually sells it. This map shows everyone who touches that loan afterwards: who pays whom, who owns what, and who takes which risk. Real firms appear in their real roles for realism; figures are approximate or examples, and no affiliation is implied." },
+    { sel: "owner", title: "Who owns it right now", body: "This bar is always on screen. It names the current owner of the loan (the IOU) and of the bond (the MBS) for the step you're on. Use the arrows to walk the loan from closing day to payoff." },
+    { sel: "controls", title: "Pick a view and an overlay", body: "Focus on Agency, Non-agency, CRT or Servicing. Overlays switch between money flows, who owns what, and who takes which risk. The 2008 switch marks what broke in the crisis." },
+    { sel: "map", title: "Click any box", body: "Each box is a real type of player. Click one to light up its money flows (animated dots show the direction money moves) and open its details. Glowing green = owns the loan right now; round badges show what each player owns." },
+    { sel: "side", title: "The player card", body: "What they do, how they get paid, their incentives and risks, real examples, and every dollar in and out. The Glossary tab explains every term." },
+    { sel: "rail", title: "More ways to learn", body: "Step through ownership, follow one monthly payment, see the risk matrix, compare 2008 with today, and test yourself. Replay this tour anytime with the Tour button." },
+  ];
+  const startTour = () => { setPage(0); setMtab("main"); setTour(0); };
+  const endTour = () => { setTour(-1); ls.set("mmm.tour.v1", "1"); };
+  useLayoutEffect(() => {
+    if (tour < 0) { setHole(null); return; }
+    const s = TOUR[tour]?.sel;
+    if (!s) { setHole(null); return; }
+    const el = [...document.querySelectorAll<HTMLElement>(`[data-tour="${s}"]`)].find((e) => e.getClientRects().length > 0 && getComputedStyle(e).display !== "none");
+    if (!el) { setHole(null); return; }
+    el.scrollIntoView({ block: "nearest" });
+    const t = setTimeout(() => { const r = el.getBoundingClientRect(); const vh = window.innerHeight, vw = window.innerWidth; setHole(new DOMRect(Math.max(4, r.left), Math.max(4, r.top), Math.min(r.width, vw - 8), Math.min(r.height, vh * 0.55))); }, 60);
+    return () => clearTimeout(t);
+  }, [tour, page]); // eslint-disable-line
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.target as HTMLElement)?.tagName === "INPUT") return;
+      if (tour >= 0) { if (e.key === "Escape") endTour(); else if (e.key === "ArrowRight") { if (tour === TOUR.length - 1) endTour(); else setTour(tour + 1); } else if (e.key === "ArrowLeft" && tour > 0) setTour(tour - 1); return; }
+      if (e.key === "ArrowRight" && page <= 1) next(); else if (e.key === "ArrowLeft" && page <= 1) prev(); else if (e.key.toLowerCase() === "g") startTour();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+  const tc = tour >= 0 ? TOUR[tour] : null;
+  let cardPos: CSSProperties = { left: "50%", top: "50%", transform: "translate(-50%,-50%)" };
+  if (hole) {
+    const vw = window.innerWidth, vh = window.innerHeight, cw = Math.min(330, vw - 24);
+    const left = Math.max(12, Math.min(hole.left, vw - cw - 12));
+    if (hole.bottom + 230 < vh) cardPos = { left, top: hole.bottom + 12 };
+    else if (hole.top - 230 > 0) cardPos = { left, top: hole.top - 12, transform: "translateY(-100%)" };
+    else cardPos = { left, top: Math.max(12, vh - 250) };
+  }
+
+  const pathOptions: PathKey[] = ["swap", "cash", "ginnie", "nonagency", "crt", "servicing"];
+  const ownBar = (
+    <div className="ownbar" data-tour="ownbar">
+      <div className="ob-top">
+        <span className="ob-step">Step {si + 1}/{steps.length} {"\u00b7"} {PATH_LABEL[path]}</span>
+        <span className="ob-title">{st.t}</span>
+        <span className="ob-nav"><button className="btn sm" onClick={prev} disabled={si === 0} aria-label="Previous ownership step">{"\u25c0"} Back</button><button className="btn sm primary" onClick={next} disabled={si === steps.length - 1} aria-label="Next ownership step">Next {"\u25b6"}</button></span>
+      </div>
+      <div className="ob-dots">{steps.map((s, i) => <button key={i} className={i === si ? "on" : i < si ? "done" : ""} onClick={() => setStep(i)} aria-label={`Step ${i + 1}: ${s.t}`} title={s.t} />)}</div>
+    </div>
+  );
+
+  const MapPage = (
+    <>
+      <div className="ws-head"><div><div className="crumb">Follow the money</div><h1>The US secondary mortgage market</h1></div></div>
+      <div className="p">Your lender usually doesn't keep your mortgage. It sells it in the <Term k="secondary">secondary mortgage market (the resale market for loans)</Term>, gets its cash back, and lends again. Click any box to see what that player does, how it gets paid and what it owns.</div>
+      <div className="metrics" style={{ margin: "10px 0 12px" }}>{FACTS.map((f) => <div key={f.k} className="metric"><div className="k">{f.k}</div><div className="v num">{f.v}</div><div className="d">{f.d}</div></div>)}</div>
+      <Panel title="Controls" tour="controls">
+        <div className="ctrl-grid">
+          <div><div className="ctl-l">View (which part of the market)</div><Seg label="View" value={view} onChange={setView} options={(["all", "agency", "nonagency", "crt", "servicing"] as ViewSel[]).map((v) => ({ value: v, label: VIEW_SHORT[v] }))} /></div>
+          <div><div className="ctl-l">Overlay (what to show)</div><Seg label="Overlay" value={overlay} onChange={setOverlay} options={[{ value: "money", label: "Money flows" }, { value: "owner", label: "Who owns what" }, { value: "risk", label: "Who takes which risk" }]} /></div>
+          {view === "all" || view === "agency" ? <div><div className="ctl-l">Agency route</div><Seg label="Agency route" value={apath} onChange={(v) => { setApath(v); setStep(0); }} options={[{ value: "swap", label: "Swap" }, { value: "cash", label: "Cash window" }, { value: "ginnie", label: "Ginnie Mae" }]} /></div> : null}
+          <div className="ctl-sw"><Switch label="2008 then vs now" value={crisis} onChange={setCrisis} /><Switch label="Animate money" value={animate} onChange={setAnimate} /></div>
+        </div>
+        {overlay === "risk" && <div className="chips" style={{ marginTop: 10 }}>{(Object.keys(RISK) as RiskKey[]).map((k) => <button key={k} className={"chip" + (risk === k ? " on" : "")} onClick={() => setRisk(k)}><span className="sw" style={{ background: RISK[k].color }} />{RISK[k].label}</button>)}</div>}
+      </Panel>
+      <div className="sticky-own">{ownBar}</div>
+      <Panel title={`${VIEW_LABEL[view]}: follow the money`} right={<span className="dim">click a box {"\u00b7"} scroll sideways on small screens</span>} tour="map" style={{ marginTop: 12 }}>
+        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} /></div>
+        <OwnLegend />
+        {overlay === "money" && <div className="p dim" style={{ margin: "6px 0 0" }}>Arrows point the way money or paper moves. Where a label doesn't fit, hover the arrow or see the full list in {P[sel].label}'s player card.</div>}
+        {overlay === "money" && <div className="legend" style={{ marginTop: 6 }}>{(Object.keys(FLOW_KIND) as FlowKind[]).map((k) => <span key={k}><span className="sw" style={{ background: FLOW_KIND[k].color }} />{FLOW_KIND[k].label}</span>)}</div>}
+        {overlay === "risk" && <div className="p" style={{ marginTop: 6 }}><b style={{ color: RISK[risk].color }}>{RISK[risk].label}:</b> {RISK[risk].plain} Lit boxes carry this risk; click one to see why.</div>}
+        {crisis && <div className="p" style={{ marginTop: 6 }}><b className="down">2008 mode:</b> red dashed boxes with a ! were at the center of the crisis. Click one to see what broke and what changed.</div>}
+      </Panel>
+      <div className="grid g-wide-left" style={{ marginTop: 12 }}>
+        <Panel title={`Ownership step ${si + 1}: ${st.t}`}>
+          <div className="p">{st.d}</div>
+          <div className="own-rows">
+            {(Object.keys(OWN) as OwnKind[]).map((k) => <div key={k} className="own-row"><span className="own-k"><i className="own-dot" style={{ background: OWN[k].color }}>{OWN[k].glyph}</i>{OWN[k].label}</span><span className="own-v">{namesOf(st, k)}</span></div>)}
+          </div>
+        </Panel>
+        <Panel title={`What the ${VIEW_SHORT[view].toLowerCase()} view shows`}><div className="p">{VIEW_EXPLAIN[view]}</div></Panel>
+      </div>
+      <div className="m-only" style={{ marginTop: 12 }}><Panel title="Selected player"><PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /></Panel></div>
+    </>
+  );
+
+  const OwnPage = (
+    <>
+      <div className="ws-head"><div><div className="crumb">Who owns it?</div><h1>Legal ownership, step by step</h1></div></div>
+      <div className="p">Four different things get owned, and they often sit with different players: <b style={{ color: OWN.loan.color }}>the loan</b> (the <Term k="note">promissory note (the IOU)</Term>), <b style={{ color: OWN.sec.color }}>the security</b> (the <Term k="mbs">MBS (bond)</Term> backed by many loans), <b style={{ color: OWN.risk.color }}>the risk only</b> (a promise to pay if loans go bad) and <b style={{ color: OWN.msr.color }}>the servicing rights</b> (the right to collect payments for a fee). Everyone else just <b style={{ color: OWN.cash.color }}>handles cash or records for a fee</b>.</div>
+      <Panel title="Pick a route" style={{ marginTop: 10 }}>
+        <div className="chips">{pathOptions.map((k) => <button key={k} className={"chip" + (path === k ? " on" : "")} onClick={() => pickPath(k)}>{PATH_LABEL[k]}</button>)}</div>
+      </Panel>
+      <div className="sticky-own" style={{ marginTop: 12 }}>{ownBar}</div>
+      <div className="grid g-wide-left" style={{ marginTop: 12 }}>
+        <Panel title="Timeline (click a step)">
+          <div className="xpath">{steps.map((s, i) => <button key={i} className={"xstep tl" + (i === si ? " on" : i < si ? " done" : "")} onClick={() => setStep(i)}><span className="xn">{i + 1}</span><span><span className="xt">{s.t}</span>{i === si && <span className="xd" style={{ display: "block", marginTop: 4 }}>{s.d}</span>}<span className="tl-own"><span><i className="own-dot" style={{ background: OWN.loan.color }}>L</i>{s.loan}</span><span><i className="own-dot" style={{ background: OWN.sec.color }}>S</i>{s.sec}</span></span></span></button>)}</div>
+        </Panel>
+        <Panel title="Right now">
+          <div className="own-rows">{(Object.keys(OWN) as OwnKind[]).map((k) => <div key={k} className="own-row"><span className="own-k"><i className="own-dot" style={{ background: OWN[k].color }}>{OWN[k].glyph}</i>{OWN[k].label}</span><span className="own-v">{namesOf(st, k)}</span></div>)}</div>
+          <div style={{ marginTop: 10 }}><button className="btn sm primary" onClick={() => { setOverlay("owner"); setPage(0); }}>See this step on the map</button></div>
+        </Panel>
+      </div>
+      <Panel title="Ownership ledger: the loan vs the bond" tight style={{ marginTop: 12 }} tour="ledger">
+        <div className="tbl-wrap">
+          <table className="tbl ledger">
+            <thead><tr><th>Step</th><th style={{ color: OWN.loan.color }}>Owns the loan</th><th style={{ color: OWN.sec.color }}>Owns the bond</th><th style={{ color: OWN.risk.color }}>Owns only risk</th><th style={{ color: OWN.msr.color }}>Owns servicing rights</th></tr></thead>
+            <tbody>{steps.map((s, i) => <tr key={i} className={i === si ? "cur" : ""} onClick={() => setStep(i)}><td><b>{i + 1}.</b> {s.t}</td><td>{namesOf(s, "loan")}</td><td>{namesOf(s, "sec")}</td><td>{namesOf(s, "risk")}</td><td>{namesOf(s, "msr")}</td></tr>)}</tbody>
+          </table>
+        </div>
+      </Panel>
+      <div className="callout" style={{ marginTop: 12 }}><div className="cl">Common mix-ups</div>
+        <b>The servicer doesn't own your loan.</b> It owns the right to collect (the MSR). <b>MERS doesn't own it either</b>; it keeps the records. <b>MBS investors don't own your loan</b>; they own a share of a trust's cash. <b>CAS and STACR investors own no loans or bonds of the pool</b>, only a slice of the credit risk.
+      </div>
+    </>
+  );
+
+  const pages: ReactNode[] = [
+    MapPage,
+    OwnPage,
+    <><div className="ws-head"><div><div className="crumb">Follow one payment</div><h1>Where one monthly payment goes</h1></div></div><OneDollar /></>,
+    <><div className="ws-head"><div><div className="crumb">Who takes which risk</div><h1>Four risks, and who carries each</h1></div></div><RiskPage onShow={(k) => { setRisk(k); setOverlay("risk"); setPage(0); }} /></>,
+    <><div className="ws-head"><div><div className="crumb">2008: then vs now</div><h1>What broke, and what changed</h1></div></div><CrisisPage onMap={() => { setCrisis(true); setPage(0); }} /></>,
+    <><div className="ws-head"><div><div className="crumb">Glossary</div><h1>Every term, in plain English</h1></div></div><Panel><Glossary q={gq} setQ={setGq} /></Panel></>,
+    <><div className="ws-head"><div><div className="crumb">Check yourself</div><h1>Quick quiz</h1></div></div><Quiz ans={quiz} setAns={setQuiz} /></>,
+  ];
+
+  return (
+    <div className={"app" + (mtab === "player" ? " m-coach" : mtab === "glossary" ? " m-coach" : "")}>
+      <header className="topbar" data-tour="topbar">
+        <div className="brand"><span className="logo">$</span><span className="brand-t">MORTGAGE MONEY MAP</span></div>
+        <div className="own-cells" data-tour="owner">
+          <div className="tb-cell own-cell"><span className="k">Owns the loan now</span><span className="v" title={st.loan}><i className="own-dot" style={{ background: OWN.loan.color }}>L</i><span className="ot">{st.loan}</span></span></div>
+          <div className="tb-cell own-cell"><span className="k">Owns the bond (MBS) now</span><span className="v" title={st.sec}><i className="own-dot" style={{ background: OWN.sec.color }}>S</i><span className="ot">{st.sec}</span></span></div>
+        </div>
+        <div className="tb-grow" />
+        <span className="tb-nav"><button className="icon-btn" onClick={prev} disabled={si === 0} aria-label="Previous ownership step" title="Previous step">{"\u25c0"}</button><span className="num dim tb-stepn">{si + 1}/{steps.length}</span><button className="icon-btn" onClick={next} disabled={si === steps.length - 1} aria-label="Next ownership step" title="Next step">{"\u25b6"}</button></span>
+        <button className="icon-btn tour-btn" data-tour="tourbtn" onClick={startTour} aria-label="Replay the guided tour" title="Replay the guided tour (G)">{"\u25b6"} <span className="tour-lbl">Replay tour</span></button>
+        <button className="icon-btn" onClick={() => setTheme(theme === "dark" ? "light" : "dark")} aria-label="Switch light or dark mode" title="Light / dark">{theme === "dark" ? "\u263c" : "\u263e"}</button>
+      </header>
+      <div className="stage-strip" data-tour="rail" aria-label="Sections">{PAGES.map(([t], i) => <button key={t} className={"chip" + (page === i ? " on" : "")} onClick={() => { setPage(i); setMtab("main"); }}>{i + 1}. {t}</button>)}</div>
+      <main className="main" id="workspace">
+        {pages[page]}
+        <div className="legal app-legal">{DISCLAIMER}</div>
+      </main>
+      <aside className="side" data-tour="side" aria-label="Player details and glossary">
+        <div className="side-tabs"><button className={"tab" + ((mtab === "glossary" || (mtab !== "player" && sideTab === "glossary")) ? " on" : "")} onClick={() => { setSideTab("glossary"); setMtab((m) => (m === "main" ? m : "glossary")); }}>Glossary</button><button className={"tab" + ((mtab === "player" || (mtab !== "glossary" && sideTab === "player")) ? " on" : "")} onClick={() => { setSideTab("player"); setMtab((m) => (m === "main" ? m : "player")); }}>Player</button></div>
+        <div className="side-body">
+          {(mtab === "glossary" || (mtab === "main" && sideTab === "glossary")) ? <Glossary q={gq} setQ={setGq} /> : <>
+            <div className="chips side-pick">{["borrower", "rocket", "fannie", "ginnie", "agencytrust", "servicer", "managers", "cas"].map((id) => <button key={id} className={"chip" + (sel === id ? " on" : "")} onClick={() => pick(id)}>{P[id].label}</button>)}</div>
+            <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} />
+          </>}
+        </div>
+      </aside>
+      <nav className="mtabs" aria-label="Mobile tabs">
+        <button className={mtab === "main" ? "on" : ""} onClick={() => setMtab("main")}>Explore</button>
+        <button className={mtab === "player" ? "on" : ""} onClick={() => setMtab("player")}>Player</button>
+        <button className={mtab === "glossary" ? "on" : ""} onClick={() => setMtab("glossary")}>Glossary</button>
+        <button onClick={startTour} aria-label="Replay the guided tour">{"\u25b6"} Tour</button>
+      </nav>
+      {tc && (
+        <>
+          {hole ? <div className="tour-hole" style={{ left: hole.left - 4, top: hole.top - 4, width: hole.width + 8, height: hole.height + 8 }} /> : <div className="scrim" style={{ zIndex: 599 }} />}
+          <div className="tour-card" role="dialog" aria-label="Tour" style={cardPos}>
+            <h4>{tc.title}</h4>
+            <p>{tc.body}</p>
+            <div className="tf">
+              <div className="dots">{TOUR.map((_, i) => <i key={i} className={i === tour ? "on" : ""} />)}</div>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button className="btn sm" onClick={endTour}>Skip tour</button>
+                {tour > 0 && <button className="btn sm" onClick={() => setTour(tour - 1)}>Back</button>}
+                <button className="btn sm primary" onClick={() => (tour === TOUR.length - 1 ? endTour() : setTour(tour + 1))}>{tour === TOUR.length - 1 ? "Done" : "Next"}</button>
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
