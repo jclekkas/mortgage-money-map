@@ -34,3 +34,9 @@ node smoke.mjs   # headless checks at 1440x900 and 390x844 (needs Chrome at /usr
 ```
 
 Stack: Vite + React 18 + TypeScript, no runtime dependencies beyond React, and system fonts only. It deploys to GitHub Pages through `.github/workflows/deploy.yml`.
+
+## Arrows and the warehouse loop
+
+- With nothing selected, the map shows only the current ownership step's flows. Click a box to see only that player's flows; unrelated boxes dim. Arrows run in channels between the lanes so they never cross a box. Colors: money green, paper blue, fees amber, risk purple, rules and records dashed gray. A label that doesn't fit appears when you hover its arrow.
+- Warehouse lines (the lender's credit line) are a first-class flow. Banks such as JPMorgan Chase, Wells Fargo, Citi, Texas Capital and Customers Bank (the warehouse lenders) fund the closing. The loan is pledged and the document custodian holds the note, then the loan is sold and the proceeds repay the line. Approx. figures: 95–98% advance rate, 2–4 weeks on the line, SOFR + 1.5–2.5%. The map also covers MSR financing lines, gestation repo, and Fannie Mae and Freddie Mac early funding.
+- The new ownership role, "Holds as collateral (C)", means a security interest, not ownership.
