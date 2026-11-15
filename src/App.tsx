@@ -2,7 +2,11 @@ import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { DISCLAIMER, FACTS, FLOW_LEGEND, OWN, P, QUIZ, PATH_LABEL, RISK, TIMELINES, VIEW_LABEL, VIEW_SHORT, pathFor } from "./data";
 import type { AgencyPath, OwnKind, PathKey, RiskKey, ViewSel } from "./data";
-import { MoneyMap, inView } from "./map";
+import { MoneyMap, inView, selectFlows } from "./map";
+import { DEFAULT_LF, applyFilter, decodeHash, encodeHash, idOf as ALLidx, lineText, universe } from "./lines";
+import type { LineFilter } from "./lines";
+import { LineFilterPanel, ShownList, hideLf, soloLf } from "./lineFilter";
+import type { Flow } from "./data";
 import type { Overlay } from "./map";
 import { Panel, Seg, Switch, Term } from "./ui";
 import { BASE_ASSUMP, HUBS, ORIG, REFRESH, calc } from "./credit";
@@ -21,16 +25,20 @@ const VIEW_EXPLAIN: Record<ViewSel, ReactNode> = {
 };
 
 export default function App() {
-  const [page, setPageRaw] = useState(() => Number(ls.get("mmm.page") ?? 0) || 0);
+  const [H] = useState(() => decodeHash(typeof location !== "undefined" ? location.hash : ""));
+  const [page, setPageRaw] = useState(() => H.page ?? (Number(ls.get("mmm.page") ?? 0) || 0));
   const setPage = (n: number) => { setPageRaw(n); ls.set("mmm.page", String(n)); document.querySelector(".main")?.scrollTo(0, 0); };
-  const [view, setViewRaw] = useState<ViewSel>("all");
-  const [apath, setApath] = useState<AgencyPath>("swap");
-  const [step, setStep] = useState(0);
-  const [overlay, setOverlay] = useState<Overlay>("money");
+  const [view, setViewRaw] = useState<ViewSel>(H.view ?? "all");
+  const [apath, setApath] = useState<AgencyPath>(H.apath ?? "swap");
+  const [step, setStep] = useState(H.step ?? 0);
+  const [overlay, setOverlay] = useState<Overlay>(H.overlay ?? "money");
+  const [lf, setLf] = useState<LineFilter>(H.lf ?? DEFAULT_LF);
+  const [lfOpen, setLfOpen] = useState(false);
+  const [lineMenu, setLineMenu] = useState<{ f: Flow; x: number; y: number } | null>(null);
   const [risk, setRisk] = useState<RiskKey>("credit");
   const [crisis, setCrisis] = useState(false);
   const [animate, setAnimate] = useState(true);
-  const [sel, setSel] = useState("");
+  const [sel, setSel] = useState(H.sel ?? "");
   const [assump, setAssump] = useState<Assump>(BASE_ASSUMP);
   const rows = useMemo(() => calc(assump), [assump]);
   const hasCredit = (id: string) => !!(REFRESH[id] || ORIG[id] || HUBS[id]);
@@ -61,6 +69,22 @@ export default function App() {
     const t = setTimeout(() => setFlash(null), 2600);
     return () => { cancelAnimationFrame(r); clearTimeout(t); };
   }, [flash?.n]); // eslint-disable-line
+  useEffect(() => { const h = encodeHash({ page, view, overlay, sel, apath, step: si, lf }); try { history.replaceState(null, "", "#" + h); } catch { /* ignore */ } }, [page, view, overlay, sel, apath, si, lf]);
+  const uni = useMemo(() => universe(view), [view]);
+  const shownFlows = selectFlows({ view, overlay, sel, focus: [...Object.keys(st.own), "borrower"], show: st.show, lines: lf.custom ? applyFilter(uni, lf) : null });
+  // When only a few lines show, scroll the sideways-scrolling map (mobile) so they're in view.
+  useEffect(() => {
+    if (!lf.custom || shownFlows.length === 0 || shownFlows.length > 3) return;
+    const r = requestAnimationFrame(() => {
+      const sc = document.querySelector<HTMLElement>(".mm-scroll"); const ps = [...document.querySelectorAll<SVGPathElement>(".mm-svg .mm-edge")];
+      if (!sc || !ps.length || sc.scrollWidth <= sc.clientWidth + 2) return;
+      const bs = ps.map((p) => p.getBoundingClientRect()); const l = Math.min(...bs.map((b) => b.left)), rr = Math.max(...bs.map((b) => b.right)); const c = sc.getBoundingClientRect();
+      sc.scrollLeft += (l + rr) / 2 - (c.left + c.width / 2);
+    });
+    return () => cancelAnimationFrame(r);
+  }, [lf, sel, view]); // eslint-disable-line
+  const solo = (f: Flow) => { setLf(soloLf(f)); setSel(""); setLineMenu(null); };
+  const hide = (f: Flow) => { setLf(hideLf(lf.custom ? lf : { ...DEFAULT_LF, off: uni.filter((x) => !shownFlows.includes(x)).map((x) => ALLidx(x)) }, f)); setLineMenu(null); };
   const prev = () => setStep(Math.max(0, si - 1)), next = () => setStep(Math.min(steps.length - 1, si + 1));
 
   // ---------- tour ----------
@@ -133,7 +157,14 @@ export default function App() {
       </Panel>
       <div className="sticky-own">{ownBar}</div>
       <Panel title={`${VIEW_LABEL[view]}: follow the money`} right={overlay === "credit" ? (sel ? <span className="showing">Credit checks at <b>{P[sel].label}</b> <button className="btn sm" onClick={() => setSel("")}>Clear {"\u2715"}</button></span> : <span className="dim showing">Showing who pays for credit checks {"\u00b7"} click a box or a marker</span>) : sel ? <span className="showing">Showing <b>{P[sel].label}</b>'s flows <button className="btn sm" onClick={() => setSel("")}>Clear {"\u2715"}</button></span> : <span className="dim showing">Showing this step's flows {"\u00b7"} click a box for its flows</span>} tour="map" style={{ marginTop: 12 }}>
-        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} flash={flash?.id} focus={[...Object.keys(st.own), "borrower"]} show={st.show} rows={rows} /></div>
+        <div className="lf-bar">
+          <button className={"btn sm" + (lfOpen ? " primary" : "")} onClick={() => setLfOpen(!lfOpen)} aria-expanded={lfOpen} data-testid="lf-toggle"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><path d="M1.5 2.5h13l-5 6v5l-3-1.5v-3.5z" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" /></svg> Filter lines</button>
+          <span className="lf-count" data-testid="lf-count-bar">Showing {shownFlows.length} of {uni.length} lines{lf.custom ? " (your filter)" : sel ? ` (${P[sel].label})` : " (this step)"}</span>
+          {lf.custom && <button className="btn sm" onClick={() => setLf(DEFAULT_LF)}>Reset lines</button>}
+        </div>
+        {lfOpen && <><div className="lf-back" onClick={() => setLfOpen(false)} /><div className="lf-sheet"><LineFilterPanel lf={lf} setLf={setLf} uni={uni} shown={shownFlows.length} onClose={() => setLfOpen(false)} /></div></>}
+        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} flash={flash?.id} focus={[...Object.keys(st.own), "borrower"]} show={st.show} rows={rows} lines={lf.custom ? applyFilter(uni, lf) : null} onLine={(f, x, y) => setLineMenu({ f, x, y })} /></div>
+        <ShownList flows={shownFlows} onSolo={solo} onHide={hide} />
         {overlay === "credit" ? <CreditLegend /> : <OwnLegend />}
         <div className="legend flow-legend" style={{ marginTop: 6 }}>{FLOW_LEGEND.map((l) => <span key={l.label}><svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="19" y2="5" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? "4 3" : undefined} /><path d="M18,1.5 L25,5 L18,8.5 z" fill={l.color} /></svg>{l.label}</span>)}</div>
         <div className="p dim" style={{ margin: "6px 0 0" }}>Arrows point the way money or paper moves. A label that doesn't fit appears when you hover its arrow; every flow is listed in the player card.</div>
@@ -251,6 +282,15 @@ export default function App() {
         <button className={mtab === "glossary" ? "on" : ""} onClick={() => setMtab("glossary")}>Glossary</button>
         <button onClick={startTour} aria-label="Replay the guided tour">{"\u25b6"} Tour</button>
       </nav>
+      {lineMenu && <>
+        <div className="lf-menu-back" onClick={() => setLineMenu(null)} />
+        <div className="lf-menu" role="menu" data-testid="line-menu" style={{ left: Math.max(8, Math.min(lineMenu.x, window.innerWidth - 268)), top: Math.max(8, Math.min(lineMenu.y + 8, window.innerHeight - 150)) }}>
+          <div className="lf-menu-t">{lineText(lineMenu.f)}</div>
+          <button className="btn sm primary" onClick={() => solo(lineMenu.f)}>Show only this line</button>
+          <button className="btn sm" onClick={() => hide(lineMenu.f)}>Hide this line</button>
+          <button className="btn sm" onClick={() => setLineMenu(null)}>Close</button>
+        </div>
+      </>}
       {tc && (
         <>
           {hole ? <div className="tour-hole" style={{ left: hole.left - 4, top: hole.top - 4, width: hole.width + 8, height: hole.height + 8 }} /> : <div className="scrim" style={{ zIndex: 599 }} />}

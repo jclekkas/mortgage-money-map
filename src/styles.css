@@ -721,3 +721,54 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 18px; back
 .sbar-v { white-space: nowrap; }
 .life-col.svc .life-h b { color: #ffb27a; }
 @media (max-width: 860px) { .sbar-v { white-space: normal; } .cc-top { grid-template-columns: 1fr; } }
+
+/* line filter */
+.lf-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 8px; }
+.lf-bar .btn svg { vertical-align: -2px; margin-right: 3px; }
+.lf-count { font-size: 12px; color: var(--text2); }
+.lf-back { display: none; }
+.lf-sheet { margin-bottom: 10px; }
+.lf { background: var(--panel2); border: 1px solid var(--border2); border-radius: 10px; padding: 10px 12px; }
+.lf-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.lf-head-r { margin-left: auto; display: flex; gap: 6px; }
+.lf-auto { font-size: 12px; color: var(--text2); margin: 8px 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.lf-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); gap: 16px; }
+.lf-h { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--text3); margin-bottom: 6px; font-weight: 700; }
+.lf-kinds { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 5px; }
+.lf-kind { display: flex; align-items: center; gap: 7px; text-align: left; font: inherit; font-size: 12px; color: var(--text3); background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 5px 8px; cursor: pointer; }
+.lf-kind.on { color: var(--text); border-color: var(--border2); }
+.lf-kind:not(.on) .lf-sw { opacity: .3; }
+.lf-kind:not(.on) .lf-kl { text-decoration: line-through; }
+.lf-kl { flex: 1; min-width: 0; }
+.lf-n { font-size: 11px; color: var(--text3); }
+.lf-sw { flex: none; vertical-align: middle; }
+.lf-row-btns { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 7px; font-size: 12px; }
+.lf-search { width: 100%; box-sizing: border-box; background: var(--panel); color: var(--text); border: 1px solid var(--border2); border-radius: 7px; padding: 6px 9px; font: inherit; font-size: 12.5px; margin-bottom: 6px; }
+.lf-players { display: flex; flex-wrap: wrap; gap: 5px; max-height: 150px; overflow-y: auto; }
+.lf-players .chip { padding: 3px 9px; font-size: 11.5px; }
+.lf-list { max-height: 330px; overflow-y: auto; margin-top: 7px; border: 1px solid var(--border); border-radius: 8px; padding: 4px 8px; background: var(--panel); }
+.lf-lane { font-size: 10px; letter-spacing: .08em; color: var(--text3); font-weight: 700; margin: 8px 0 2px; }
+.lf-player { font-size: 12px; font-weight: 650; margin: 5px 0 2px; }
+.lf-item { display: flex; align-items: center; gap: 6px; padding: 2px 0 2px 6px; font-size: 12px; }
+.lf-item label { flex: 1; min-width: 0; display: flex; align-items: center; gap: 6px; cursor: pointer; line-height: 1.35; }
+.lf-item label b { font-weight: 600; }
+.lf-item input { flex: none; margin: 0; accent-color: var(--accent); }
+.lf-item.muted label { opacity: .45; }
+.lf-only { flex: none; height: 22px; font-size: 11px; padding: 0 7px; }
+.lf-shown { margin-top: 8px; }
+.lf-shown ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.lf-shown li { display: flex; align-items: center; gap: 7px; font-size: 12px; flex-wrap: wrap; }
+.lf-st { flex: 1; min-width: 160px; }
+.lf-num { width: 18px; height: 18px; border-radius: 50%; border: 1px solid var(--border2); display: grid; place-items: center; font-size: 10.5px; font-weight: 700; flex: none; }
+.mm-badge text { font-size: 10px; font-weight: 750; fill: var(--text); }
+.lf-menu-back { position: fixed; inset: 0; z-index: 700; }
+.lf-menu { position: fixed; z-index: 701; width: 260px; background: var(--panel); border: 1px solid var(--border2); border-radius: 10px; padding: 10px; box-shadow: 0 10px 30px rgba(0,0,0,.45); display: flex; flex-direction: column; gap: 6px; }
+.lf-menu-t { font-size: 12.5px; line-height: 1.4; margin-bottom: 2px; }
+@media (max-width: 860px) {
+  .lf-back { display: block; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 650; }
+  .lf-sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 651; max-height: 78vh; overflow-y: auto; margin: 0; border-radius: 14px 14px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,.5); }
+  .lf-sheet .lf { border-radius: 14px 14px 0 0; padding: 12px 14px 22px; }
+  .lf-sheet .lf-head { position: sticky; top: -12px; background: var(--panel2); padding: 4px 0 6px; z-index: 1; }
+  .lf-grid { grid-template-columns: 1fr; }
+  .lf-list { max-height: none; }
+}

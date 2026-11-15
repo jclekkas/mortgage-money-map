@@ -19,7 +19,7 @@ const OVERLAP = () => {
   }
   const out = [];
   for (let i = 0; i < items.length; i++) for (let j = i + 1; j < items.length; j++) {
-    const a = items[i], b = items[j]; if (a.el === b.el) continue; if (!!a.el.closest(".sticky-own") !== !!b.el.closest(".sticky-own")) continue;
+    const a = items[i], b = items[j]; if (a.el === b.el) continue; if (!!a.el.closest(".sticky-own") !== !!b.el.closest(".sticky-own")) continue; if (!!a.el.closest(".lf-sheet,.lf-menu") !== !!b.el.closest(".lf-sheet,.lf-menu")) continue;
     const ox = Math.min(a.r, b.r) - Math.max(a.l, b.l), oy = Math.min(a.b, b.b) - Math.max(a.t, b.t);
     if (ox > 2 && oy > 3) out.push(`"${a.txt}" x "${b.txt}"`);
   }
@@ -85,6 +85,46 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   for (const id of ["bureaus", "scores", "rocket", "fannie", "cas", "warehouse"]) { await D.node(id); await D.check(`credit ${id}`); }
   await D.page.evaluate(() => { const b = [...document.querySelectorAll(".life-dot.could")][3]; b.dispatchEvent(new MouseEvent("click", { bubbles: true })); }); await sleep(300); await D.check("life strip click");
   await D.click("Clear"); await D.click("Money flows", ".seg button");
+  // ---------- line filter ----------
+  {
+    const P = D.page; const edges = () => P.evaluate(() => document.querySelectorAll(".mm-svg .mm-edge").length);
+    const bar = () => P.evaluate(() => document.querySelector("[data-testid=lf-count-bar]").innerText);
+    const scrollMap = async () => { if (tag === "desktop") await P.evaluate(() => document.querySelector("[data-tour=map]").scrollIntoView()); else await P.evaluate(() => { const m = document.querySelector(".main"); m.scrollTo(0, document.querySelector("[data-tour=map]").offsetTop - 140); }); await sleep(500); };
+    await D.click("Everything", ".seg button"); await D.click("Money flows", ".seg button");
+    await P.evaluate(() => document.querySelector("[data-testid=lf-toggle]").click()); await sleep(250);
+    notes.push(`${tag} filter open (auto): ${await bar()} | kinds ${await P.evaluate(() => [...document.querySelectorAll("[data-kind]")].map((b) => b.dataset.kind + "=" + b.querySelector(".lf-n").innerText).join(" "))} | rows ${await P.evaluate(() => document.querySelectorAll("[data-flow]").length)}`);
+    await D.check("filter open auto");
+    await D.click("Show all", ".lf button"); await sleep(200); notes.push(`${tag} show all: edges=${await edges()} | ${await bar()}`); await D.check("filter all lines");
+    if (tag === "desktop") await P.evaluate(() => document.querySelector("[data-testid=lf-toggle]").scrollIntoView()); await sleep(300); await D.shot(`${tag}-filter-panel`);
+    await P.evaluate(() => document.querySelector('[data-kind="fees"]').click()); await sleep(150); notes.push(`${tag} fees off: edges=${await edges()}`);
+    await P.evaluate(() => document.querySelector('[data-kind="fees"]').click()); await sleep(100);
+    await P.evaluate(() => document.querySelector('[data-player="fannie"]').click()); await sleep(150); const fe = await edges();
+    await P.evaluate(() => document.querySelector('[data-player="agencytrust"]').click()); await D.click("Only lines between selected players", ".lf .switch"); await sleep(150);
+    notes.push(`${tag} player fannie: edges=${fe}; fannie+trust between-only: edges=${await edges()}`); await D.check("filter players");
+    await P.evaluate(() => { const i = document.querySelector(".lf-search[aria-label='Search lines']"); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; s.call(i, "g-fee"); i.dispatchEvent(new Event("input", { bubbles: true })); }); await sleep(150);
+    const soloTxt = await P.evaluate(() => { const b = document.querySelector("[data-solo]"); const t = b.getAttribute("aria-label"); b.click(); return t; }); await sleep(250);
+    const n1 = await edges(); if (n1 !== 1) errors.push(`${tag} SOLO rendered ${n1} paths, expected exactly 1`);
+    notes.push(`${tag} SOLO "${soloTxt}": paths=${n1} | ${await bar()} | label pills=${await P.evaluate(() => document.querySelectorAll(".mm-svg .mm-lbl:not(.mm-badge)").length)} badges=${await P.evaluate(() => document.querySelectorAll(".mm-badge").length)} | shown list=${await P.evaluate(() => document.querySelectorAll("[data-testid=lines-shown] li").length)}`);
+    await D.check("filter solo panel open");
+    if (tag === "mobile") { await P.evaluate(() => document.querySelector(".lf-sheet").scrollTo(0, 0)); await sleep(150); await D.shot("mobile-filter-sheet"); }
+    await D.click("Done", ".lf button"); await scrollMap(); await D.check("filter solo"); await D.shot(`${tag}-filter-solo`);
+    const hash = await P.evaluate(() => location.hash); notes.push(`${tag} hash: ${hash}`);
+    await P.reload({ waitUntil: "load" }); await sleep(500);
+    const n2 = await edges(); if (n2 !== 1) errors.push(`${tag} after reload with hash rendered ${n2} paths, expected 1`); notes.push(`${tag} reload from hash: paths=${n2} | ${await bar()}`);
+    await P.evaluate(() => document.querySelector("[data-testid=lf-toggle]").click()); await sleep(200);
+    await D.click("Clear all", ".lf button"); await sleep(150); notes.push(`${tag} clear all: paths=${await edges()}`);
+    await D.click("Select all", ".lf button"); await sleep(150); notes.push(`${tag} select all: paths=${await edges()}`);
+    await D.click("Done", ".lf button"); await D.click("Reset lines"); await sleep(150);
+    // click one arrow -> "Show only this line"
+    await scrollMap();
+    await P.evaluate(() => { const p = document.querySelector(".mm-svg [data-line]"); const b = p.getBoundingClientRect(); p.dispatchEvent(new MouseEvent("click", { bubbles: true, clientX: b.left + b.width / 2, clientY: b.top + b.height / 2 })); }); await sleep(200);
+    notes.push(`${tag} line menu: ${await P.evaluate(() => document.querySelector("[data-testid=line-menu] .lf-menu-t")?.textContent ?? "NO MENU")}`);
+    await D.check("line menu"); if (tag === "desktop") await D.shot("desktop-line-menu");
+    await D.click("Show only this line", ".lf-menu button"); await sleep(200);
+    const n3 = await edges(); if (n3 !== 1) errors.push(`${tag} line menu solo rendered ${n3} paths`); notes.push(`${tag} line menu solo: paths=${n3}`);
+    await D.node("fannie"); notes.push(`${tag} solo + click fannie: paths=${await edges()}`); await D.click("Clear"); await D.click("Reset lines"); await sleep(150);
+    notes.push(`${tag} after reset: ${await bar()}`);
+  }
   // other pages
   const pages = ["Who owns it?", "Follow one payment", "Who takes which risk", "2008: then vs now", "Credit checks", "Glossary", "Check yourself"];
   for (const [i, p] of pages.entries()) {

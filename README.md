@@ -47,3 +47,14 @@ Stack: Vite + React 18 + TypeScript, no runtime dependencies beyond React, and s
 - **Below the map:** a ranked "Top refresh opportunities" list (click to highlight the player) and a loan-life strip (application → closing → sale → years 1–30). Filled dots are checks that happen today; hollow dots are refreshes that could happen.
 - **Credit checks page:** all 26 use cases, TAM/SAM/realistic by segment, and assumption sliders that recompute every figure. It links to the full report: https://cursor.com/canvas/store-6237da13-0cef-430b-bfed-4e9101656458/721375f6-2a13-4298-bf1f-a42ab2c5cbdf
 - All frequencies and dollars are estimates built on sourced inputs, except where marked sourced (for example, Fannie Mae has published monthly refreshed scores on CAS deals since 2016). Legal notes are a plain reading of FCRA §604, not legal advice.
+
+## Filter lines
+
+- On the Money map, **Filter lines** opens a panel: inline on desktop, a bottom sheet on mobile. In it you can:
+  1. Toggle line types with counts: money, paper, fees, risk, rules/records, credit pull fees, warehouse.
+  2. Pick players, with an option to show only lines between the selected players.
+  3. Search a checklist of every line ("From → To: what"), grouped by lane and player, with Select all, Clear all and **Only this**.
+- "Showing N of M lines" and Reset are always visible. Filters combine with the views, the overlays and click-a-box.
+- Click any arrow to get **Show only this line** or **Hide this line**.
+- With 10 or fewer lines shown, every line gets a label and appears in a "Lines shown" list.
+- The URL hash saves the view, overlay, selected player and line filter, so a filtered map can be shared as a link.

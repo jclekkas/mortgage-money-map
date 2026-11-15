@@ -17,6 +17,16 @@ export const CREDIT_FLOWS: Flow[] = [
   cf("fannie", "bureaus", "monthly CAS score data"), cf("fannie", "cas", "monthly refreshed scores", "info"), cf("raters", "bureaus", "surveillance data"),
   cf("managers", "bureaus", "credit trend feeds"), cf("creditinv", "bureaus", "refresh at bid"), cf("plsissuer", "bureaus", "TPR cut-off refresh"),
 ];
+// Which lines the map draws. `lines` (a custom filter) replaces the automatic choice; a clicked box narrows either.
+export function selectFlows(o: { view: ViewSel; overlay: Overlay; sel: string; focus: string[]; show?: string[]; lines?: Flow[] | null }): Flow[] {
+  const { view, overlay, sel, focus, show = [], lines } = o;
+  const touch = (f: Flow) => f.from === sel || f.to === sel;
+  if (lines) return sel ? lines.filter(touch) : lines;
+  const both = (f: Flow) => inView(P[f.from].views, view) && inView(P[f.to].views, view);
+  if (overlay === "credit") return CREDIT_FLOWS.filter((f) => both(f) && (sel ? touch(f) : CREDIT_DEFAULT.includes(f.label)));
+  const fset = new Set(focus);
+  return flowsFor(view).filter((f) => (sel ? touch(f) : show.includes(f.label) || (!f.stepOnly && f.kind !== "info" && fset.has(f.from) && fset.has(f.to))));
+}
 const CREDIT_DEFAULT = ["tri-merge + scores, approx. $77", "score royalty, approx. $5–$10", "batch soft refreshes (est.)"];
 export const NW = 168, NH = 48, GAP = 30, PITCH = 80;
 export const LX = (lane: number) => 20 + NW / 2 + lane * (NW + GAP), RY = (row: number) => 66 + row * PITCH;
@@ -74,25 +84,23 @@ function pathD(pts: Pt[], r = 7): string {
   return d + ` L${l.x},${l.y}`;
 }
 
-export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate, flash, focus, show = [], rows = [] }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean; flash?: string; focus: string[]; show?: string[]; rows?: Row[] }) {
+export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate, flash, focus, show = [], rows = [], lines = null, onLine }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean; flash?: string; focus: string[]; show?: string[]; rows?: Row[]; lines?: Flow[] | null; onLine?: (f: Flow, x: number, y: number) => void }) {
   const [hov, setHov] = useState(-1);
   const bearers = RISK_BEARERS[risk];
-  const fset = new Set(focus);
   // Only the selected player's flows, or (nothing selected) the current ownership step's flows.
   const credit = overlay === "credit";
-  const both = (f: Flow) => inView(P[f.from].views, view) && inView(P[f.to].views, view);
-  const flows = credit
-    ? CREDIT_FLOWS.filter((f) => both(f) && (sel ? f.from === sel || f.to === sel : CREDIT_DEFAULT.includes(f.label)))
-    : flowsFor(view).filter((f) => (sel ? f.from === sel || f.to === sel : show.includes(f.label) || (!f.stepOnly && f.kind !== "info" && fset.has(f.from) && fset.has(f.to))));
+  const flows = selectFlows({ view, overlay, sel, focus, show, lines });
+  const force = flows.length > 0 && flows.length <= 10; // few lines: every line gets a visible label (pill, or numbered badge + list)
   const wsOf: Record<string, number> = {};
   if (credit) Object.keys(REFRESH).forEach((id) => { wsOf[id] = nodeWs(rows, id); });
   const maxWs = Math.max(1, ...Object.values(wsOf));
   const hasCredit = (id: string) => !!(REFRESH[id] || ORIG[id] || HUBS[id]);
-  const linked = new Set<string>(sel ? [sel, ...flows.flatMap((f) => [f.from, f.to])] : []);
+  const narrowed = !sel && !!lines && flows.length > 0 && flows.length <= 20; // a small custom filter dims boxes not on its lines
+  const linked = new Set<string>(sel ? [sel, ...flows.flatMap((f) => [f.from, f.to])] : narrowed ? flows.flatMap((f) => [f.from, f.to]) : []);
   const lit = (id: string) => {
     const p = P[id];
     if (!inView(p.views, view)) return false;
-    if (sel && !linked.has(id)) return false;
+    if ((sel || narrowed) && !linked.has(id)) return false;
     if (overlay === "owner") return !!own[id] || linked.has(id);
     if (overlay === "risk") return !!bearers[id] || id === sel;
     if (credit) return hasCredit(id) || linked.has(id);
@@ -113,7 +121,7 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
     const segs = pts.slice(1).map((p, k) => ({ a: pts[k], b: p })).filter((s) => Math.abs(s.a.y - s.b.y) < 0.5).sort((s, t) => Math.abs(t.b.x - t.a.x) - Math.abs(s.b.x - s.a.x));
     for (const s of segs) {
       const len = Math.abs(s.b.x - s.a.x);
-      for (const t of [0.5, 0.3, 0.7, 0.18, 0.82]) {
+      for (const t of force ? [0.5, 0.3, 0.7, 0.4, 0.6, 0.18, 0.82, 0.1, 0.9] : [0.5, 0.3, 0.7, 0.18, 0.82]) {
         const x = s.a.x + (s.b.x - s.a.x) * t, y = s.a.y;
         const bx: Box = { x: x - w / 2, y: y - h / 2, w, h };
         fallback ??= bx;
@@ -139,18 +147,31 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
     }
     if (!fallback) { const m = pts[Math.floor(pts.length / 2)]; fallback = { x: m.x - w / 2, y: m.y - h / 2, w, h }; }
     if (lab) placed.push({ x: lab.x - 3, y: lab.y - 3, w: lab.w + 6, h: lab.h + 6 });
-    return { f, i, d, lab, fallback };
+    return { f, i, d, pts, lab, fallback, badge: null as Box | null };
+  });
+  // Few lines: labels that didn't fit get a small numbered badge on the line, matched by the "Lines shown" list.
+  if (force) items.forEach((it) => {
+    if (it.lab) return;
+    const B = 16; let got: Box | null = null;
+    for (let k = 1; k < it.pts.length && !got; k++) {
+      const a = it.pts[k - 1], b = it.pts[k];
+      for (const t of [0.5, 0.3, 0.7, 0.15, 0.85]) { const bx: Box = { x: a.x + (b.x - a.x) * t - B / 2, y: a.y + (b.y - a.y) * t - B / 2, w: B, h: B }; if (!nodeBoxes.some((n) => hit(n, bx)) && !placed.some((n) => hit(n, bx))) { got = bx; break; } }
+    }
+    if (!got) { const m = it.pts[Math.floor(it.pts.length / 2)]; got = { x: m.x - B / 2, y: m.y - B / 2, w: B, h: B }; }
+    placed.push({ x: got.x - 2, y: got.y - 2, w: got.w + 4, h: got.h + 4 });
+    it.badge = got;
   });
   const pill = (f: Flow, b: Box, key: string, hover = false) => { const col = FLOW_KIND[f.kind].color; return <g key={key} className={"mm-lbl" + (hover ? " hover" : "")} pointerEvents="none"><rect x={b.x} y={b.y} width={b.w} height={b.h} rx={8} style={{ fill: "var(--panel)", stroke: col }} strokeWidth={1} /><text x={b.x + b.w / 2} y={b.y + b.h / 2 + 3.5} textAnchor="middle">{f.label}</text></g>; };
-  const lines: ReactNode[] = [], dots: ReactNode[] = [], labels: ReactNode[] = [];
-  items.forEach(({ f, i, d, lab }) => {
+  const edges: ReactNode[] = [], dots: ReactNode[] = [], labels: ReactNode[] = [];
+  items.forEach(({ f, i, d, lab, badge }) => {
     const col = FLOW_KIND[f.kind].color, on = hov === i;
-    lines.push(<g key={"e" + i} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(-1)}>
-      <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: "help" }}><title>{`${P[f.from].label} \u2192 ${P[f.to].label}: ${f.label}`}</title></path>
+    edges.push(<g key={"e" + i} onMouseEnter={() => setHov(i)} onMouseLeave={() => setHov(-1)}>
+      <path d={d} fill="none" stroke="transparent" strokeWidth={12} style={{ cursor: onLine ? "pointer" : "help" }} data-line={`${f.from}>${f.to}:${f.label}`} onClick={(e) => { e.stopPropagation(); onLine?.(f, e.clientX, e.clientY); }}><title>{`${P[f.from].label} \u2192 ${P[f.to].label}: ${f.label}`}</title></path>
       <path d={d} fill="none" className={"mm-edge" + (f.kind === "info" ? " info" : "")} style={{ stroke: col, strokeWidth: on ? 2.6 : 1.7, opacity: hov >= 0 && !on ? 0.35 : 0.95 }} markerEnd={`url(#mm-a-${f.kind})`} pointerEvents="none" />
     </g>);
     if (animate && f.kind !== "info") dots.push(<circle key={"d" + i} r={2.6} style={{ fill: col }} pointerEvents="none"><animateMotion dur={`${2.4 + (i % 4) * 0.3}s`} repeatCount="indefinite" path={d} /></circle>);
     if (lab) labels.push(pill(f, lab, "l" + i));
+    if (badge) labels.push(<g key={"b" + i} className="mm-lbl mm-badge" pointerEvents="none"><circle cx={badge.x + 8} cy={badge.y + 8} r={8} style={{ fill: "var(--panel)", stroke: col }} strokeWidth={1.4} /><text x={badge.x + 8} y={badge.y + 11.5} textAnchor="middle">{i + 1}</text></g>);
   });
   const hv = items.find((x) => x.i === hov);
   return (
@@ -158,7 +179,7 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
       <defs>{(Object.keys(FLOW_KIND) as Flow["kind"][]).map((k) => <marker key={k} id={"mm-a-" + k} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" markerUnits="strokeWidth" orient="auto"><path d="M0,0.5 L7.5,4 L0,7.5 z" style={{ fill: FLOW_KIND[k].color }} /></marker>)}</defs>
       {LANES.map((l, i) => <g key={l}><rect x={LX(i) - HALF - 6} y={30} width={NW + 12} height={MAP_H - 36} rx={10} className="mm-laneband" /><text x={LX(i)} y={20} textAnchor="middle" className="mm-lane">{l}</text></g>)}
       <text x={LX(4)} y={RY(4) + 5} textAnchor="middle" className="mm-lane">SERVICING</text>
-      {lines}
+      {edges}
       {PLAYERS.map((p) => {
         const x = LX(p.lane) - NW / 2, y = RY(p.row) - NH / 2;
         const on = sel === p.id, ok = lit(p.id), kinds = own[p.id] ?? [], ownsLoan = kinds.includes("loan");
