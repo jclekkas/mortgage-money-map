@@ -1,14 +1,17 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { DISCLAIMER, FACTS, FLOW_LEGEND, OWN, P, QUIZ, PATH_LABEL, RISK, TIMELINES, VIEW_LABEL, VIEW_SHORT, pathFor } from "./data";
 import type { AgencyPath, OwnKind, PathKey, RiskKey, ViewSel } from "./data";
 import { MoneyMap, inView } from "./map";
 import type { Overlay } from "./map";
 import { Panel, Seg, Switch, Term } from "./ui";
+import { BASE_ASSUMP, HUBS, ORIG, REFRESH, calc } from "./credit";
+import type { Assump } from "./credit";
+import { CreditCard, CreditLegend, CreditPage, LifeStrip, RefreshTop } from "./creditPages";
 import { CrisisPage, Glossary, OneDollar, OwnBadges, OwnLegend, PlayerCard, Quiz, RiskPage, namesOf } from "./pages";
 
 const ls = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } } };
-const PAGES: [string, string][] = [["Money map", "follow the money"], ["Who owns it?", "loan vs bond, step by step"], ["Follow one payment", "where your dollar goes"], ["Who takes which risk", "credit, prepay, rates, cash"], ["2008: then vs now", "what broke, what changed"], ["Glossary", "every term, in plain English"], ["Check yourself", `${QUIZ.length}-question quiz`]];
+const PAGES: [string, string][] = [["Money map", "follow the money"], ["Who owns it?", "loan vs bond, step by step"], ["Follow one payment", "where your dollar goes"], ["Who takes which risk", "credit, prepay, rates, cash"], ["2008: then vs now", "what broke, what changed"], ["Credit checks", "refresh opportunities, sized"], ["Glossary", "every term, in plain English"], ["Check yourself", `${QUIZ.length}-question quiz`]];
 const VIEW_EXPLAIN: Record<ViewSel, ReactNode> = {
   all: <>Every player at once. Pick a view above to focus on one part of the market. Most US mortgages travel the <b>agency</b> route: lenders sell them to Fannie Mae or Freddie Mac (the agency guarantors), or pool them under Ginnie Mae (the government guarantor), and the loans become <Term k="mbs">mortgage-backed securities, MBS (bonds made of mortgages)</Term>.</>,
   agency: <>The government-backed highway. Lenders swap or sell loans to Fannie Mae and Freddie Mac (the agency guarantors) or pool FHA and VA loans under Ginnie Mae (the government guarantor). The bonds trade in the <Term k="tba">TBA market (forward orders for generic bonds)</Term>, the guarantors earn a <Term k="gfee">guarantee fee, g-fee (insurance premium)</Term>, and investors take rate and prepayment risk but not credit risk.</>,
@@ -28,6 +31,9 @@ export default function App() {
   const [crisis, setCrisis] = useState(false);
   const [animate, setAnimate] = useState(true);
   const [sel, setSel] = useState("");
+  const [assump, setAssump] = useState<Assump>(BASE_ASSUMP);
+  const rows = useMemo(() => calc(assump), [assump]);
+  const hasCredit = (id: string) => !!(REFRESH[id] || ORIG[id] || HUBS[id]);
   const [sideTab, setSideTab] = useState<"player" | "glossary">("player");
   const [mtab, setMtab] = useState<"main" | "player" | "glossary">("main");
   const [gq, setGq] = useState("");
@@ -48,6 +54,7 @@ export default function App() {
   const ownerNode = (k: OwnKind): string | null => { const ids = Object.entries(st.own).filter(([, ks]) => ks.includes(k)).map(([id]) => id); if (!ids.length) return null; return ids.find((id) => inView(P[id].views, view)) ?? ids[0]; };
   const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
   const showOnMap = (id: string) => { if (page !== 0) setPage(0); setMtab("main"); setSel(id); setSideTab("player"); setFlash((f) => ({ id, n: (f?.n ?? 0) + 1 })); };
+  const showCredit = (id: string) => { setOverlay("credit"); showOnMap(id); };
   useEffect(() => {
     if (!flash) return;
     const r = requestAnimationFrame(() => { const el = document.querySelector<SVGGElement>(`[data-node="${flash.id}"]`); if (el) { el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); } });
@@ -63,6 +70,7 @@ export default function App() {
     { sel: "controls", title: "Pick a view and an overlay", body: "Focus on Agency, Non-agency, CRT or Servicing. Overlays switch between money flows, who owns what, and who takes which risk. The 2008 switch marks what broke in the crisis." },
     { sel: "map", title: "Click any box", body: "With nothing selected, the arrows show just this ownership step's flows. Click a box to see only that player's flows (green = money, blue = paper, amber = fees, purple = risk) and open its details. Glowing green = owns the loan right now; round badges show what each player owns." },
     { sel: "map", title: "Follow the warehouse line too", body: "Most loans are made by nonbank lenders that don't have the cash themselves. They draw on a warehouse line (the lender's credit line) from banks like JPMorgan, Wells Fargo or Texas Capital, pledge the new loan as collateral, and repay the line when the loan is sold. Click Warehouse lenders to see the loop; the cyan C badge means 'holds as collateral, not owner'." },
+    { sel: "controls", title: "Where could credit be refreshed?", body: "Pick the Credit refreshes overlay. Every player that holds or carries risk on an existing loan gets a gauge: the dot is how often borrowers' credit is checked today, the ring is how often it plausibly could be, and the glow shows the dollar gap (estimates). Hard pulls at application are still marked, but they're the crowded part of the market." },
     { sel: "side", title: "The player card", body: "What they do, how they get paid, their incentives and risks, real examples, and every dollar in and out. The Glossary tab explains every term." },
     { sel: "rail", title: "More ways to learn", body: "Step through ownership, follow one monthly payment, see the risk matrix, compare 2008 with today, and test yourself. Replay this tour anytime with the Tour button." },
   ];
@@ -117,21 +125,26 @@ export default function App() {
       <Panel title="Controls" tour="controls">
         <div className="ctrl-grid">
           <div><div className="ctl-l">View (which part of the market)</div><Seg label="View" value={view} onChange={setView} options={(["all", "agency", "nonagency", "crt", "servicing"] as ViewSel[]).map((v) => ({ value: v, label: VIEW_SHORT[v] }))} /></div>
-          <div><div className="ctl-l">Overlay (what to show)</div><Seg label="Overlay" value={overlay} onChange={setOverlay} options={[{ value: "money", label: "Money flows" }, { value: "owner", label: "Who owns what" }, { value: "risk", label: "Who takes which risk" }]} /></div>
+          <div><div className="ctl-l">Overlay (what to show)</div><Seg label="Overlay" value={overlay} onChange={setOverlay} options={[{ value: "money", label: "Money flows" }, { value: "owner", label: "Who owns what" }, { value: "risk", label: "Who takes which risk" }, { value: "credit", label: "Credit refreshes" }]} /></div>
           {view === "all" || view === "agency" ? <div><div className="ctl-l">Agency route</div><Seg label="Agency route" value={apath} onChange={(v) => { setApath(v); setStep(0); }} options={[{ value: "swap", label: "Swap" }, { value: "cash", label: "Cash window" }, { value: "ginnie", label: "Ginnie Mae" }]} /></div> : null}
           <div className="ctl-sw"><Switch label="2008 then vs now" value={crisis} onChange={setCrisis} /><Switch label="Animate money" value={animate} onChange={setAnimate} /></div>
         </div>
         {overlay === "risk" && <div className="chips" style={{ marginTop: 10 }}>{(Object.keys(RISK) as RiskKey[]).map((k) => <button key={k} className={"chip" + (risk === k ? " on" : "")} onClick={() => setRisk(k)}><span className="sw" style={{ background: RISK[k].color }} />{RISK[k].label}</button>)}</div>}
       </Panel>
       <div className="sticky-own">{ownBar}</div>
-      <Panel title={`${VIEW_LABEL[view]}: follow the money`} right={sel ? <span className="showing">Showing <b>{P[sel].label}</b>'s flows <button className="btn sm" onClick={() => setSel("")}>Clear {"\u2715"}</button></span> : <span className="dim showing">Showing this step's flows {"\u00b7"} click a box for its flows</span>} tour="map" style={{ marginTop: 12 }}>
-        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} flash={flash?.id} focus={[...Object.keys(st.own), "borrower"]} /></div>
-        <OwnLegend />
+      <Panel title={`${VIEW_LABEL[view]}: follow the money`} right={overlay === "credit" ? (sel ? <span className="showing">Credit checks at <b>{P[sel].label}</b> <button className="btn sm" onClick={() => setSel("")}>Clear {"\u2715"}</button></span> : <span className="dim showing">Showing who pays for credit checks {"\u00b7"} click a box or a marker</span>) : sel ? <span className="showing">Showing <b>{P[sel].label}</b>'s flows <button className="btn sm" onClick={() => setSel("")}>Clear {"\u2715"}</button></span> : <span className="dim showing">Showing this step's flows {"\u00b7"} click a box for its flows</span>} tour="map" style={{ marginTop: 12 }}>
+        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} flash={flash?.id} focus={[...Object.keys(st.own), "borrower"]} show={st.show} rows={rows} /></div>
+        {overlay === "credit" ? <CreditLegend /> : <OwnLegend />}
         <div className="legend flow-legend" style={{ marginTop: 6 }}>{FLOW_LEGEND.map((l) => <span key={l.label}><svg width="26" height="10" aria-hidden="true"><line x1="1" y1="5" x2="19" y2="5" stroke={l.color} strokeWidth="2" strokeDasharray={l.dashed ? "4 3" : undefined} /><path d="M18,1.5 L25,5 L18,8.5 z" fill={l.color} /></svg>{l.label}</span>)}</div>
         <div className="p dim" style={{ margin: "6px 0 0" }}>Arrows point the way money or paper moves. A label that doesn't fit appears when you hover its arrow; every flow is listed in the player card.</div>
         {overlay === "risk" && <div className="p" style={{ marginTop: 6 }}><b style={{ color: RISK[risk].color }}>{RISK[risk].label}:</b> {RISK[risk].plain} Lit boxes carry this risk; click one to see why.</div>}
+        {overlay === "credit" && <div className="p" style={{ marginTop: 6 }}><b>Credit refreshes:</b> players that hold or carry risk on existing loans show how often borrowers' credit is checked today (dot) versus plausibly (ring), and the yearly dollar gap. Application pulls are marked H but aren't the opportunity: they already happen on nearly every loan. All frequencies and dollars are estimates unless marked sourced.</div>}
         {crisis && <div className="p" style={{ marginTop: 6 }}><b className="down">2008 mode:</b> red dashed boxes with a ! were at the center of the crisis. Click one to see what broke and what changed.</div>}
       </Panel>
+      {overlay === "credit" && <>
+        <Panel title="Top refresh opportunities" right={<button className="btn sm" onClick={() => setPage(5)}>Full sizing</button>} style={{ marginTop: 12 }}><RefreshTop rows={rows} onShow={showCredit} sel={sel} /></Panel>
+        <Panel title="A loan's life: checks today vs refreshes that could happen" style={{ marginTop: 12 }} tour="life"><LifeStrip onShow={showCredit} /><div className="p dim" style={{ marginTop: 6 }}>Filled = happens today; hollow = could happen. Click any dot to highlight that player. Estimates unless marked sourced.</div></Panel>
+      </>}
       <div className="grid g-wide-left" style={{ marginTop: 12 }}>
         <Panel title={`Ownership step ${si + 1}: ${st.t}`}>
           <div className="p">{st.d}</div>
@@ -141,7 +154,7 @@ export default function App() {
         </Panel>
         <Panel title={`What the ${VIEW_SHORT[view].toLowerCase()} view shows`}><div className="p">{VIEW_EXPLAIN[view]}</div></Panel>
       </div>
-      <div className="m-only" style={{ marginTop: 12 }}><Panel title="Selected player">{sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /> : <div className="p dim">Tap any box on the map to see what that player does, how it gets paid and what it owns.</div>}</Panel></div>
+      <div className="m-only" style={{ marginTop: 12 }}><Panel title="Selected player">{sel && overlay === "credit" && hasCredit(sel) && <CreditCard id={sel} rows={rows} />}{sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /> : <div className="p dim">Tap any box on the map to see what that player does, how it gets paid and what it owns.</div>}</Panel></div>
     </>
   );
 
@@ -194,6 +207,7 @@ export default function App() {
     <><div className="ws-head"><div><div className="crumb">Follow one payment</div><h1>Where one monthly payment goes</h1></div></div><OneDollar /></>,
     <><div className="ws-head"><div><div className="crumb">Who takes which risk</div><h1>Four risks, and who carries each</h1></div></div><RiskPage onShow={(k) => { setRisk(k); setOverlay("risk"); setPage(0); }} /></>,
     <><div className="ws-head"><div><div className="crumb">2008: then vs now</div><h1>What broke, and what changed</h1></div></div><CrisisPage onMap={() => { setCrisis(true); setPage(0); }} /></>,
+    <><div className="ws-head"><div><div className="crumb">Credit checks</div><h1>Credit checks and refresh opportunities</h1></div></div><CreditPage rows={rows} a={assump} setA={setAssump} onShow={showCredit} /></>,
     <><div className="ws-head"><div><div className="crumb">Glossary</div><h1>Every term, in plain English</h1></div></div><Panel><Glossary q={gq} setQ={setGq} /></Panel></>,
     <><div className="ws-head"><div><div className="crumb">Check yourself</div><h1>Quick quiz</h1></div></div><Quiz ans={quiz} setAns={setQuiz} /></>,
   ];
@@ -226,6 +240,7 @@ export default function App() {
         <div className="side-body">
           {(mtab === "glossary" || (mtab === "main" && sideTab === "glossary")) ? <Glossary q={gq} setQ={setGq} /> : <>
             <div className="chips side-pick">{["borrower", "rocket", "warehouse", "fannie", "ginnie", "agencytrust", "servicer", "managers", "cas"].map((id) => <button key={id} className={"chip" + (sel === id ? " on" : "")} onClick={() => pick(id)}>{P[id].label}</button>)}</div>
+            {sel && overlay === "credit" && hasCredit(sel) && <CreditCard id={sel} rows={rows} />}
             {sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /> : <div className="pcard"><div className="pc-h">Pick a player</div><div className="p">Click any box on the map, or a name above, to see what that player does, how it gets paid, its incentives and risks, real examples, and every dollar in and out.</div><div className="p dim">Tip: Warehouse lenders (the lender's credit line) fund most closings before a loan is ever sold.</div></div>}
           </>}
         </div>

@@ -1,9 +1,23 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { PLAYERS, FLOWS, FLOW_KIND, OWN, LANES, RISK, RISK_BEARERS, P } from "./data";
-import type { ViewSel, OwnKind, RiskKey, Flow } from "./data";
+import type { ViewSel, OwnKind, RiskKey, Flow, View } from "./data";
+import { REFRESH, ORIG, HUBS, PULL, CASE, LEVELS, nodeWs, usd, todayLbl, plausLbl } from "./credit";
+import type { Row } from "./credit";
 
-export type Overlay = "money" | "owner" | "risk";
+export type Overlay = "money" | "owner" | "risk" | "credit";
+const V4: View[] = ["agency", "nonagency", "crt", "servicing"];
+const cf = (from: string, to: string, label: string, kind: Flow["kind"] = "fee"): Flow => ({ from, to, label, kind, views: V4 });
+// Who pays for credit checks (shown only in the Credit refreshes overlay)
+export const CREDIT_FLOWS: Flow[] = [
+  cf("rocket", "bureaus", "tri-merge + scores, approx. $77"), cf("bureaus", "scores", "score royalty, approx. $5–$10"), cf("servicer", "bureaus", "batch soft refreshes (est.)"),
+  cf("uwm", "bureaus", "tri-merge via broker"), cf("broker", "bureaus", "prequal + tri-merge"), cf("wells", "bureaus", "mortgage + HELOC pulls"), cf("smalllender", "bureaus", "application pulls"),
+  cf("banks", "bureaus", "HELOC + stress-test refresh"), cf("msrowner", "bureaus", "MSR bid refresh"), cf("mi", "bureaus", "insured-book refresh"),
+  cf("warehouse", "bureaus", "pledged-pool refresh"), cf("fhlb", "bureaus", "collateral refresh"), cf("pennymac", "bureaus", "purchase re-check"),
+  cf("fannie", "bureaus", "monthly CAS score data"), cf("fannie", "cas", "monthly refreshed scores", "info"), cf("raters", "bureaus", "surveillance data"),
+  cf("managers", "bureaus", "credit trend feeds"), cf("creditinv", "bureaus", "refresh at bid"), cf("plsissuer", "bureaus", "TPR cut-off refresh"),
+];
+const CREDIT_DEFAULT = ["tri-merge + scores, approx. $77", "score royalty, approx. $5–$10", "batch soft refreshes (est.)"];
 export const NW = 168, NH = 48, GAP = 30, PITCH = 80;
 export const LX = (lane: number) => 20 + NW / 2 + lane * (NW + GAP), RY = (row: number) => 66 + row * PITCH;
 export const MAP_W = 20 * 2 + 6 * NW + 5 * GAP, MAP_H = RY(8) + NH / 2 + 22;
@@ -60,12 +74,20 @@ function pathD(pts: Pt[], r = 7): string {
   return d + ` L${l.x},${l.y}`;
 }
 
-export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate, flash, focus }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean; flash?: string; focus: string[] }) {
+export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate, flash, focus, show = [], rows = [] }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean; flash?: string; focus: string[]; show?: string[]; rows?: Row[] }) {
   const [hov, setHov] = useState(-1);
   const bearers = RISK_BEARERS[risk];
   const fset = new Set(focus);
   // Only the selected player's flows, or (nothing selected) the current ownership step's flows.
-  const flows = flowsFor(view).filter((f) => (sel ? f.from === sel || f.to === sel : f.kind !== "info" && fset.has(f.from) && fset.has(f.to)));
+  const credit = overlay === "credit";
+  const both = (f: Flow) => inView(P[f.from].views, view) && inView(P[f.to].views, view);
+  const flows = credit
+    ? CREDIT_FLOWS.filter((f) => both(f) && (sel ? f.from === sel || f.to === sel : CREDIT_DEFAULT.includes(f.label)))
+    : flowsFor(view).filter((f) => (sel ? f.from === sel || f.to === sel : show.includes(f.label) || (!f.stepOnly && f.kind !== "info" && fset.has(f.from) && fset.has(f.to))));
+  const wsOf: Record<string, number> = {};
+  if (credit) Object.keys(REFRESH).forEach((id) => { wsOf[id] = nodeWs(rows, id); });
+  const maxWs = Math.max(1, ...Object.values(wsOf));
+  const hasCredit = (id: string) => !!(REFRESH[id] || ORIG[id] || HUBS[id]);
   const linked = new Set<string>(sel ? [sel, ...flows.flatMap((f) => [f.from, f.to])] : []);
   const lit = (id: string) => {
     const p = P[id];
@@ -73,6 +95,7 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
     if (sel && !linked.has(id)) return false;
     if (overlay === "owner") return !!own[id] || linked.has(id);
     if (overlay === "risk") return !!bearers[id] || id === sel;
+    if (credit) return hasCredit(id) || linked.has(id);
     return true;
   };
   // consistent ports: spread flows that share a box side
@@ -81,6 +104,7 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
   const portOff = (node: string, side: string, i: number) => { const L = sideUse[node + side]; const j = L.indexOf(i), n = L.length; const step = side === "T" || side === "B" ? 22 : 8; return clamp((j - (n - 1) / 2) * step, side === "T" || side === "B" ? 66 : 19); };
   const nodeBoxes: Box[] = PLAYERS.map((p) => ({ x: LX(p.lane) - HALF - 3, y: RY(p.row) - NH / 2 - 9, w: NW + 6, h: NH + 12 }));
   const placed: Box[] = [{ x: 0, y: 0, w: MAP_W, h: 26 }, { x: LX(4) - 50, y: RY(4) - 9, w: 100, h: 20 }];
+  if (credit) PLAYERS.forEach((p) => { if (REFRESH[p.id] && inView(p.views, view)) placed.push({ x: LX(p.lane) - HALF, y: RY(p.row) + NH / 2 + 2, w: 140, h: 16 }); });
   const items = flows.map((f, i) => {
     const pts = route(f, portOff(f.from, sd[i][0], i), portOff(f.to, sd[i][1], i), ((i % 5) - 2) * 3);
     const d = pathD(pts);
@@ -142,6 +166,7 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
         const cr = crisis && !!p.crisis;
         return (
           <g key={p.id} className={"mm-node" + (on ? " on" : "") + (ok ? "" : " dim") + (flash === p.id ? " flash" : "")} transform={`translate(${x},${y})`} onClick={() => onPick(p.id)} tabIndex={0} role="button" aria-label={`${p.name}${kinds.length ? ", " + kinds.map((k) => OWN[k].short).join(", ") : ""}`} data-node={p.id} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(p.id); } }}>
+            {credit && ok && REFRESH[p.id] && (() => { const t = Math.sqrt((wsOf[p.id] ?? 0) / maxWs), g = 3 + 10 * t; return <rect className="mm-heat" x={-g} y={-g} width={NW + 2 * g} height={NH + 2 * g} rx={10 + g} style={{ opacity: 0.12 + 0.6 * t }} />; })()}
             {flash === p.id && <rect className="mm-flash-ring" x={-9} y={-9} width={NW + 18} height={NH + 18} rx={15} />}
             {ownsLoan && <rect className="mm-owner-ring" x={-6} y={-6} width={NW + 12} height={NH + 12} rx={13} />}
             <rect className="mm-box" width={NW} height={NH} rx={9} style={{ stroke: on ? "var(--amber)" : rc ?? (cr ? "var(--down)" : ownsLoan ? OWN.loan.color : "var(--border2)"), fill: rc ? `color-mix(in srgb, ${rc} 16%, var(--panel2))` : ownsLoan ? "color-mix(in srgb, #2bd47d 14%, var(--panel2))" : undefined }} strokeWidth={on ? 2.6 : rc || ownsLoan ? 2 : 1.2} strokeDasharray={cr && !on ? "5 3" : undefined} />
@@ -149,6 +174,24 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
             <text x={13} y={20} className="mm-n1">{p.label}</text>
             <text x={13} y={36} className="mm-n2">{p.role}</text>
             {kinds.map((k, j) => <g key={k} transform={`translate(${NW - 12 - j * 21},0)`}><circle r={9} style={{ fill: OWN[k].color, stroke: "var(--panel)" }} strokeWidth={2} /><text y={3.6} textAnchor="middle" className="mm-glyph">{OWN[k].glyph}</text></g>)}
+            {credit && ok && hasCredit(p.id) && (() => {
+              const r = REFRESH[p.id], o = ORIG[p.id];
+              const pt = r ? CASE[r.cases[0][0]].pt : o ? o.pt : null;
+              const mk = pt ? PULL[pt] : { color: "#ffb547", glyph: "$", short: "Paid for pulls" };
+              const tip = r ? `Refresh today: ${r.todayText}. Could be: ${r.plausText}. Whitespace approx. ${usd(wsOf[p.id] ?? 0)} a year (estimate).` : o ? `Origination pull: ${o.note}` : HUBS[p.id];
+              return <>
+                <g className="mm-ccmark" transform={`translate(${NW - 12},${NH})`} data-ccmark={p.id} onClick={(e) => { e.stopPropagation(); onPick(p.id); }}><title>{tip}</title><circle r={8} style={{ fill: mk.color, stroke: "var(--panel)" }} strokeWidth={2} /><text y={3.4} textAnchor="middle" className="mm-glyph">{mk.glyph}</text></g>
+                {r && <g className="mm-gauge" transform={`translate(8,${NH + 9})`} aria-label={`Refresh today ${todayLbl(r)}, could be ${plausLbl(r)}`}>
+                  <title>{tip}</title>
+                  <line x1={0} x2={44} y1={0} y2={0} className="mm-gauge-track" />
+                  {r.plaus > r.today && <line x1={r.today * 11} x2={r.plaus * 11} y1={0} y2={0} className="mm-gauge-gap" />}
+                  {LEVELS.map((_, k) => <circle key={k} cx={k * 11} cy={0} r={1.6} className="mm-gauge-tick" />)}
+                  <circle cx={r.plaus * 11} cy={0} r={4.2} className="mm-gauge-plaus" />
+                  <circle cx={r.today * 11} cy={0} r={3.4} className="mm-gauge-today" />
+                  <text x={54} y={3.5} className="mm-gauge-t">{(wsOf[p.id] ?? 0) >= 5e5 ? `+${usd(wsOf[p.id])}/yr est.` : "no gap: monthly"}</text>
+                </g>}
+              </>;
+            })()}
             {cr && <g transform="translate(12,0)"><circle r={8} style={{ fill: "var(--down)", stroke: "var(--panel)" }} strokeWidth={2} /><text y={3.6} textAnchor="middle" className="mm-glyph">!</text></g>}
           </g>
         );

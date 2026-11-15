@@ -49,7 +49,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   // views x overlays, select every node in each view to exercise hot labels
   for (const v of ["Everything", "Agency", "Non-agency", "CRT", "Servicing"]) {
     await D.click(v, ".seg button");
-    for (const ov of ["Money flows", "Who owns what", "Who takes which risk"]) {
+    for (const ov of ["Money flows", "Who owns what", "Who takes which risk", "Credit refreshes"]) {
       await D.click(ov, ".seg button");
       const ids = await D.page.evaluate(() => [...document.querySelectorAll("[data-node]")].map((g) => g.getAttribute("data-node")));
       for (const id of ids) { await D.node(id); const o = await D.page.evaluate(OVERLAP); if (o.length) overlaps.push(`${tag} [${v}/${ov}/${id}] ${o.slice(0, 5).join(" | ")}`); }
@@ -66,13 +66,43 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   await D.click("Who owns what", ".seg button"); await D.click("Non-agency", ".seg button"); await D.page.evaluate(() => document.querySelectorAll(".ob-dots button")[2].dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(400); await D.shot(`${tag}-map-owner-nonagency`);
   await D.click("Who takes which risk", ".seg button"); await D.click("Everything", ".seg button"); await D.click("Prepayment risk", ".chip"); await D.click("2008 then vs now", ".switch"); await sleep(300); await D.shot(`${tag}-map-risk-2008`); await D.check("risk+2008");
   await D.click("2008 then vs now", ".switch"); await D.click("Money flows", ".seg button");
+  // quirk: repay arrow only on the settlement step
+  { const repay = async (s) => { await D.page.evaluate((s) => document.querySelectorAll(".ob-dots button")[s].dispatchEvent(new MouseEvent("click", { bubbles: true })), s); await sleep(120); return D.page.evaluate(() => [...document.querySelectorAll(".mm-svg title")].filter((t) => t.textContent.includes("sale proceeds repay line")).length); };
+    await D.page.evaluate(() => document.querySelector(".mm-node.on")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))); await D.click("Clear"); notes.push(`${tag} repay arrow by step (no selection): ${[await repay(0), await repay(1), await repay(2), await repay(3)].join(",")}`); await repay(0); }
+  // credit refreshes overlay
+  await D.click("Credit refreshes", ".seg button"); await sleep(300);
+  notes.push(`${tag} credit overlay: gauges ${await D.page.evaluate(() => document.querySelectorAll(".mm-gauge").length)}, markers ${await D.page.evaluate(() => document.querySelectorAll(".mm-ccmark").length)}, heat ${await D.page.evaluate(() => document.querySelectorAll(".mm-heat").length)}, edges ${await D.page.evaluate(() => document.querySelectorAll(".mm-edge").length)}, top list ${await D.page.evaluate(() => [...document.querySelectorAll("[data-top]")].map((b) => b.getAttribute("data-top") + " " + b.querySelector(".cc-top-v").innerText.replace(/\s+/g, " ")).slice(0, 4).join("; "))}`);
+  await D.check("credit overlay default");
+  if (tag === "desktop") { await D.page.evaluate(() => document.querySelector("[data-tour=map]").scrollIntoView()); } else { await D.page.evaluate(() => { const m = document.querySelector(".main"); m.scrollTo(0, document.querySelector("[data-tour=map]").offsetTop - 120); document.querySelector('[data-node="servicer"]').scrollIntoView({ block: "center", inline: "center" }); }); }
+  await sleep(600); await D.shot(`${tag}-credit-overlay`);
+  await D.page.evaluate(() => document.querySelector('[data-ccmark="servicer"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(300);
+  notes.push(`${tag} marker click -> card: ${await D.page.evaluate(() => { const c = document.querySelector(innerWidth > 860 ? ".side [data-testid=credit-card]" : ".main [data-testid=credit-card]"); return c ? c.querySelector(".pc-h").textContent + " | " + c.querySelectorAll(".cc-case").length + " use cases | " + c.querySelector(".cc-gauge-row").innerText.replace(/\s+/g, " ").slice(0, 120) : "NO CARD"; })}`);
+  await D.check("credit servicer selected"); await sleep(300); await D.shot(`${tag}-credit-servicer`);
+  if (tag === "desktop") { await D.page.evaluate(() => document.querySelector(".side-body").scrollTo(0, 0)); }
+  await D.page.evaluate(() => document.querySelector('[data-top="msrowner"]').dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(500);
+  notes.push(`${tag} top list click msrowner -> sel=${await D.page.evaluate(() => document.querySelector(".mm-node.on")?.getAttribute("data-node"))} flash=${await D.page.evaluate(() => !!document.querySelector(".mm-node.flash"))}`);
+  await D.check("credit msr selected");
+  for (const id of ["bureaus", "scores", "rocket", "fannie", "cas", "warehouse"]) { await D.node(id); await D.check(`credit ${id}`); }
+  await D.page.evaluate(() => { const b = [...document.querySelectorAll(".life-dot.could")][3]; b.dispatchEvent(new MouseEvent("click", { bubbles: true })); }); await sleep(300); await D.check("life strip click");
+  await D.click("Clear"); await D.click("Money flows", ".seg button");
   // other pages
-  const pages = ["Who owns it?", "Follow one payment", "Who takes which risk", "2008: then vs now", "Glossary", "Check yourself"];
+  const pages = ["Who owns it?", "Follow one payment", "Who takes which risk", "2008: then vs now", "Credit checks", "Glossary", "Check yourself"];
   for (const [i, p] of pages.entries()) {
     await D.click(p, strip); await sleep(250);
     if (p === "Who owns it?") { for (const r of ["Fannie Mae swap", "Cash window", "Ginnie Mae", "Private-label", "Credit risk transfer", "Servicing rights"]) { await D.click(r, ".chip"); const n = await D.page.evaluate(() => document.querySelectorAll(".ob-dots button").length); for (let s = 0; s < n; s++) { await D.page.evaluate((s) => document.querySelectorAll(".ob-dots button")[s].dispatchEvent(new MouseEvent("click", { bubbles: true })), s); await sleep(50); await D.check(`own ${r} step ${s + 1}`); } } await D.click("Fannie Mae swap", ".chip"); await D.page.evaluate(() => document.querySelectorAll(".ob-dots button")[2].dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(200); }
     if (p === "Follow one payment") { await D.click("Play the split"); await sleep(3500); await D.check("dollar mid-play"); await sleep(4000); await D.page.evaluate(() => { const i = document.querySelector('input[type=range]'); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; s.call(i, "120"); i.dispatchEvent(new Event("input", { bubbles: true })); }); await sleep(200); notes.push(`${tag} dollar table: ${await D.page.evaluate(() => [...document.querySelectorAll(".main .tbl tbody tr")].slice(0, 6).map((r) => r.lastChild.innerText).join(", "))}`); await D.click("FHA (Ginnie Mae MBS)", ".seg button"); await sleep(200); await D.check("dollar fha"); await D.click("Conventional", ".seg button"); }
     if (p === "Check yourself") { for (let q = 0; q < await D.page.evaluate(() => document.querySelectorAll(".quiz-opts").length); q++) await D.page.evaluate((q) => document.querySelectorAll(".quiz-opts")[q].querySelectorAll(".chip")[1].dispatchEvent(new MouseEvent("click", { bubbles: true })), q); await sleep(200); notes.push(`${tag} quiz: ${await D.page.evaluate(() => [...document.querySelectorAll(".main .metric .v")].map((v) => v.innerText).join(" / "))}`); }
+    if (p === "Credit checks") {
+      const metrics = async () => D.page.evaluate(() => [...document.querySelectorAll(".main .metric .v")].map((v) => v.innerText).join(" / "));
+      notes.push(`${tag} credit page base: ${await metrics()}`);
+      for (const g of ["Origination", "Loan sale", "Servicing", "Trading", "Other"]) { await D.click(g, ".seg button"); await D.check(`credit table ${g}`); }
+      const setR = (id, v) => D.page.evaluate((id, v) => { const i = document.getElementById(id); const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set; s.call(i, String(v)); i.dispatchEvent(new Event("input", { bubbles: true })); }, id, v);
+      await setR("cc-fm", 2); await sleep(150); notes.push(`${tag} credit page refresh x2: ${await metrics()}`);
+      await setR("cc-pulls", 12); await sleep(150); notes.push(`${tag} credit page + P1 monthly: ${await metrics()}`);
+      await D.check("credit sliders"); await D.click("Reset"); notes.push(`${tag} credit page reset: ${await metrics()}`);
+      notes.push(`${tag} report link: ${await D.page.evaluate(() => [...document.querySelectorAll(".main a")].find((a) => a.href.includes("721375f6"))?.href ?? "MISSING")}`);
+      await D.click("Servicing", ".seg button");
+    }
     if (p === "Glossary") notes.push(`${tag} glossary terms: ${await D.page.evaluate(() => document.querySelectorAll(".main .dict-item").length)}`);
     await D.check(p);
     await D.page.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await sleep(150);
