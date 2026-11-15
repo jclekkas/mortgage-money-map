@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { DISCLAIMER, FACTS, FLOW_KIND, OWN, P, PATH_LABEL, RISK, TIMELINES, VIEW_LABEL, VIEW_SHORT, pathFor } from "./data";
 import type { AgencyPath, OwnKind, PathKey, RiskKey, ViewSel, FlowKind } from "./data";
-import { MoneyMap } from "./map";
+import { MoneyMap, inView } from "./map";
 import type { Overlay } from "./map";
 import { Panel, Seg, Switch, Term } from "./ui";
 import { CrisisPage, Glossary, OneDollar, OwnBadges, OwnLegend, PlayerCard, Quiz, RiskPage, namesOf } from "./pages";
@@ -44,12 +44,22 @@ export default function App() {
   const st = steps[si];
   const pickPath = (k: PathKey) => { if (k === "swap" || k === "cash" || k === "ginnie") { setApath(k); setViewRaw(view === "all" ? "all" : "agency"); } else setViewRaw(k); setStep(0); };
   const pick = (id: string) => { setSel(id); setSideTab("player"); };
+  // Ownership chips: find the map box for the current loan or bond owner and jump to it.
+  const ownerNode = (k: OwnKind): string | null => { const ids = Object.entries(st.own).filter(([, ks]) => ks.includes(k)).map(([id]) => id); if (!ids.length) return null; return ids.find((id) => inView(P[id].views, view)) ?? ids[0]; };
+  const [flash, setFlash] = useState<{ id: string; n: number } | null>(null);
+  const showOnMap = (id: string) => { if (page !== 0) setPage(0); setMtab("main"); setSel(id); setSideTab("player"); setFlash((f) => ({ id, n: (f?.n ?? 0) + 1 })); };
+  useEffect(() => {
+    if (!flash) return;
+    const r = requestAnimationFrame(() => { const el = document.querySelector<SVGGElement>(`[data-node="${flash.id}"]`); if (el) { el.scrollIntoView({ block: "center", inline: "center", behavior: "smooth" }); el.focus({ preventScroll: true }); } });
+    const t = setTimeout(() => setFlash(null), 2600);
+    return () => { cancelAnimationFrame(r); clearTimeout(t); };
+  }, [flash?.n]); // eslint-disable-line
   const prev = () => setStep(Math.max(0, si - 1)), next = () => setStep(Math.min(steps.length - 1, si + 1));
 
   // ---------- tour ----------
   const TOUR: { sel: string; title: string; body: string }[] = [
     { sel: "", title: "Welcome to the Mortgage Money Map", body: "When you get a mortgage, your lender usually sells it. This map shows everyone who touches that loan afterwards: who pays whom, who owns what, and who takes which risk. Real firms appear in their real roles for realism; figures are approximate or examples, and no affiliation is implied." },
-    { sel: "owner", title: "Who owns it right now", body: "This bar is always on screen. It names the current owner of the loan (the IOU) and of the bond (the MBS) for the step you're on. Use the arrows to walk the loan from closing day to payoff." },
+    { sel: "owner", title: "Who owns it right now", body: "This bar is always on screen. It names the current owner of the loan (the IOU) and of the bond (the MBS) for the step you're on. Click either one to jump to that owner on the map. Use the arrows to walk the loan from closing day to payoff." },
     { sel: "controls", title: "Pick a view and an overlay", body: "Focus on Agency, Non-agency, CRT or Servicing. Overlays switch between money flows, who owns what, and who takes which risk. The 2008 switch marks what broke in the crisis." },
     { sel: "map", title: "Click any box", body: "Each box is a real type of player. Click one to light up its money flows (animated dots show the direction money moves) and open its details. Glowing green = owns the loan right now; round badges show what each player owns." },
     { sel: "side", title: "The player card", body: "What they do, how they get paid, their incentives and risks, real examples, and every dollar in and out. The Glossary tab explains every term." },
@@ -114,7 +124,7 @@ export default function App() {
       </Panel>
       <div className="sticky-own">{ownBar}</div>
       <Panel title={`${VIEW_LABEL[view]}: follow the money`} right={<span className="dim">click a box {"\u00b7"} scroll sideways on small screens</span>} tour="map" style={{ marginTop: 12 }}>
-        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} /></div>
+        <div className="mm-scroll"><MoneyMap view={view} overlay={overlay} risk={risk} crisis={crisis} sel={sel} onPick={pick} own={st.own} animate={animate} flash={flash?.id} /></div>
         <OwnLegend />
         {overlay === "money" && <div className="p dim" style={{ margin: "6px 0 0" }}>Arrows point the way money or paper moves. Where a label doesn't fit, hover the arrow or see the full list in {P[sel].label}'s player card.</div>}
         {overlay === "money" && <div className="legend" style={{ marginTop: 6 }}>{(Object.keys(FLOW_KIND) as FlowKind[]).map((k) => <span key={k}><span className="sw" style={{ background: FLOW_KIND[k].color }} />{FLOW_KIND[k].label}</span>)}</div>}
@@ -179,9 +189,14 @@ export default function App() {
     <div className={"app" + (mtab === "player" ? " m-coach" : mtab === "glossary" ? " m-coach" : "")}>
       <header className="topbar" data-tour="topbar">
         <div className="brand"><span className="logo">$</span><span className="brand-t">MORTGAGE MONEY MAP</span></div>
-        <div className="own-cells" data-tour="owner">
-          <div className="tb-cell own-cell"><span className="k">Owns the loan now</span><span className="v" title={st.loan}><i className="own-dot" style={{ background: OWN.loan.color }}>L</i><span className="ot">{st.loan}</span></span></div>
-          <div className="tb-cell own-cell"><span className="k">Owns the bond (MBS) now</span><span className="v" title={st.sec}><i className="own-dot" style={{ background: OWN.sec.color }}>S</i><span className="ot">{st.sec}</span></span></div>
+        <div className="own-block" data-tour="owner" role="group" aria-label="Ownership right now">
+          <span className="own-block-l">Ownership right now</span>
+          {([["loan", "Loan owner", st.loan], ["sec", "Bond (MBS) owner", st.sec]] as const).map(([k, lbl, who]) => { const id = ownerNode(k); return (
+            <button key={k} className={"own-chip own-chip-" + k} onClick={() => id && showOnMap(id)} disabled={!id} title={id ? `Show on map: ${who}` : `${who}: nothing to show on the map yet`} aria-label={id ? `${lbl}: ${who}. Show on map` : `${lbl}: ${who}`} data-testid={"own-chip-" + k}>
+              <i className="own-dot" style={{ background: OWN[k].color }}>{OWN[k].glyph}</i>
+              <span className="oc-txt"><span className="k">{lbl}</span><span className="ot">{who}</span></span>
+              {id && <svg className="oc-go" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" strokeWidth="1.6" /><circle cx="8" cy="8" r="1.8" fill="currentColor" /><path d="M8 0.5v3M8 12.5v3M0.5 8h3M12.5 8h3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" /></svg>}
+            </button>); })}
         </div>
         <div className="tb-grow" />
         <span className="tb-nav"><button className="icon-btn" onClick={prev} disabled={si === 0} aria-label="Previous ownership step" title="Previous step">{"\u25c0"}</button><span className="num dim tb-stepn">{si + 1}/{steps.length}</span><button className="icon-btn" onClick={next} disabled={si === steps.length - 1} aria-label="Next ownership step" title="Next step">{"\u25b6"}</button></span>

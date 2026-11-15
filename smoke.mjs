@@ -59,7 +59,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   }
   await D.click("Everything", ".seg button"); await D.click("Money flows", ".seg button"); await D.node("fannie");
   await D.page.evaluate(() => document.querySelectorAll(".ob-dots button")[1].dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(200);
-  notes.push(`${tag} topbar owner: ${await D.page.evaluate(() => [...document.querySelectorAll(".own-cell")].map((c) => c.innerText.replace(/\s+/g, " ")).join(" | "))}`);
+  notes.push(`${tag} topbar owner: ${await D.page.evaluate(() => [...document.querySelectorAll(".own-chip")].map((c) => c.innerText.replace(/\s+/g, " ")).join(" | "))}`);
   notes.push(`${tag} labels drawn for Fannie Mae: ${await D.page.evaluate(() => document.querySelectorAll(".mm-lbl").length)}, dots ${await D.page.evaluate(() => document.querySelectorAll(".mm-svg circle animateMotion").length)}`);
   if (tag === "desktop") { await D.page.evaluate(() => document.querySelector("[data-tour=map]").scrollIntoView()); await sleep(1200); await D.shot(`${tag}-map-fannie-flows`); }
   else { await D.page.evaluate(() => { const m = document.querySelector(".main"); m.scrollTo(0, document.querySelector("[data-tour=map]").offsetTop - 120); }); await sleep(1200); await D.shot(`${tag}-map-fannie-flows`); }
@@ -78,6 +78,17 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
     await D.page.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await sleep(150);
     await D.shot(`${tag}-${i + 2}-${p.replace(/[^a-z0-9]+/gi, "-").toLowerCase().replace(/-$/, "")}`);
   }
+  // ownership chips: from another page, click -> map page, owner selected, in view, card opened
+  for (const [k, pg, step] of [["loan", "Follow one payment", 3], ["sec", "Who takes which risk", 3]]) {
+    await D.click(pg, strip); await sleep(200);
+    await D.page.evaluate((s) => { const b = [...document.querySelectorAll(".topbar .icon-btn")]; }, step);
+    await D.click(k === "loan" ? "Loan owner" : "Bond (MBS) owner", ".own-chip"); await sleep(1300);
+    const r = await D.page.evaluate(() => { const on = document.querySelector(".mm-node.on"); const id = on?.getAttribute("data-node"); const b = on?.getBoundingClientRect(); const vis = b && b.top >= 0 && b.bottom <= innerHeight && b.left >= 0 && b.right <= innerWidth; const flash = !!document.querySelector(".mm-node.flash"); const page = document.querySelector(".stage-strip .chip.on")?.textContent; const card = (document.querySelector(innerWidth > 860 ? ".side .pc-h" : ".main .pc-h"))?.textContent; return `${page} | sel=${id} inViewport=${vis} flash=${flash} card="${card}"`; });
+    notes.push(`${tag} ${k} chip -> ${r}`);
+    await D.check(`after ${k} chip`);
+    await D.shot(`${tag}-owner-chip-${k}`);
+  }
+  notes.push(`${tag} chip hover cursor: ${await D.page.evaluate(() => getComputedStyle(document.querySelector(".own-chip")).cursor)}; disabled bond chip at step 1: pending`);
   // mobile tabs / side panel
   if (tag === "mobile") { await D.click("Player", ".mtabs button"); await sleep(200); await D.check("mobile player tab"); await D.shot("mobile-player-tab"); await D.click("Glossary", ".mtabs button"); await D.check("mobile glossary tab"); await D.click("Explore", ".mtabs button"); }
   else { await D.click("Glossary", ".side-tabs .tab"); await D.check("side glossary"); await D.click("Player", ".side-tabs .tab"); }

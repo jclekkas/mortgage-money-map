@@ -27,7 +27,7 @@ function geom(f: Flow) {
   return { d: `M${p0.x.toFixed(1)},${p0.y.toFixed(1)} Q${cx.toFixed(1)},${cy.toFixed(1)} ${p2.x.toFixed(1)},${p2.y.toFixed(1)}`, at };
 }
 
-export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean }) {
+export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animate, flash }: { view: ViewSel; overlay: Overlay; risk: RiskKey; crisis: boolean; sel: string; onPick: (id: string) => void; own: Record<string, OwnKind[]>; animate: boolean; flash?: string }) {
   const flows = flowsFor(view).filter((f) => overlay === "money" || (overlay === "owner" && (f.kind === "asset")));
   const nodeBoxes: Box[] = PLAYERS.map((p) => ({ x: LX(p.lane) - NW / 2 - 4, y: RY(p.row) - NH / 2 - 10, w: NW + 8, h: NH + 14 }));
   const placed: Box[] = [{ x: 0, y: 0, w: MAP_W, h: 28 }, { x: LX(4) - 50, y: RY(4) - 8, w: 100, h: 20 }];
@@ -73,7 +73,8 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
         const rc = overlay === "risk" && bearers[p.id] ? RISK[risk].color : null;
         const cr = crisis && !!p.crisis;
         return (
-          <g key={p.id} className={"mm-node" + (on ? " on" : "") + (ok ? "" : " dim")} transform={`translate(${x},${y})`} onClick={() => onPick(p.id)} tabIndex={0} role="button" aria-label={`${p.name}${kinds.length ? ", " + kinds.map((k) => OWN[k].short).join(", ") : ""}`} data-node={p.id} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(p.id); } }}>
+          <g key={p.id} className={"mm-node" + (on ? " on" : "") + (ok ? "" : " dim") + (flash === p.id ? " flash" : "")} transform={`translate(${x},${y})`} onClick={() => onPick(p.id)} tabIndex={0} role="button" aria-label={`${p.name}${kinds.length ? ", " + kinds.map((k) => OWN[k].short).join(", ") : ""}`} data-node={p.id} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(p.id); } }}>
+            {flash === p.id && <rect className="mm-flash-ring" x={-9} y={-9} width={NW + 18} height={NH + 18} rx={15} />}
             {ownsLoan && <rect className="mm-owner-ring" x={-6} y={-6} width={NW + 12} height={NH + 12} rx={13} />}
             <rect className="mm-box" width={NW} height={NH} rx={9} style={{ stroke: on ? "var(--amber)" : rc ?? (cr ? "var(--down)" : ownsLoan ? OWN.loan.color : "var(--border2)"), fill: rc ? `color-mix(in srgb, ${rc} 16%, var(--panel2))` : ownsLoan ? "color-mix(in srgb, #2bd47d 14%, var(--panel2))" : undefined }} strokeWidth={on ? 2.6 : rc || ownsLoan ? 2 : 1.2} strokeDasharray={cr && !on ? "5 3" : undefined} />
             <rect width={4} height={NH} rx={2} style={{ fill: LANE_COLOR[p.lane] }} />
