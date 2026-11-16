@@ -4,8 +4,9 @@ import type { Flow, ViewSel, AgencyPath } from "./data";
 import { CREDIT_FLOWS, inView } from "./map";
 import type { Overlay } from "./map";
 
-export type LineCat = "money" | "paper" | "fees" | "risk" | "rules" | "credit" | "warehouse";
-export const CAT_ORDER: LineCat[] = ["money", "paper", "fees", "risk", "rules", "credit", "warehouse"];
+export type LineCat = "money" | "paper" | "fees" | "risk" | "rules" | "credit" | "warehouse" | "clearing";
+export const CAT_ORDER: LineCat[] = ["money", "paper", "fees", "risk", "rules", "credit", "warehouse", "clearing"];
+export const CLEARING_IDS = ["dtcc", "ficc", "ficcgsd", "dtc", "fedwire"];
 export const CATS: Record<LineCat, { label: string; color: string; dashed?: boolean }> = {
   money: { label: "Money (cash, payments)", color: "#2bd47d" },
   paper: { label: "Paper (loans, notes, bonds)", color: "#4d9fff" },
@@ -14,6 +15,7 @@ export const CATS: Record<LineCat, { label: string; color: string; dashed?: bool
   rules: { label: "Rules and records", color: "#8b96a5", dashed: true },
   credit: { label: "Credit pull fees (bureaus, scores)", color: "#2dd4bf" },
   warehouse: { label: "Warehouse line", color: "#22d3ee" },
+  clearing: { label: "Clearing, settlement & custody (DTCC, Fedwire)", color: "#f0abfc" },
 };
 // Credit-overlay flows that duplicate a money-map flow (same two players) are dropped.
 export const ALL: Flow[] = [...FLOWS, ...CREDIT_FLOWS.filter((c) => !FLOWS.some((f) => f.from === c.from && f.to === c.to))];
@@ -24,6 +26,7 @@ export function catsOf(f: Flow): LineCat[] {
   const out: LineCat[] = [k];
   if (["bureaus", "scores"].includes(f.from) || ["bureaus", "scores"].includes(f.to)) out.push("credit");
   if (f.from === "warehouse" || f.to === "warehouse") out.push("warehouse");
+  if (CLEARING_IDS.includes(f.from) || CLEARING_IDS.includes(f.to)) out.push("clearing");
   return out;
 }
 export const lineText = (f: Flow) => `${P[f.from].label} \u2192 ${P[f.to].label}: ${f.label}`;

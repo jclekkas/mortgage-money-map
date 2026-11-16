@@ -37,6 +37,38 @@ async function open(tag, vp) {
   const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png` });
   return { page, click, node, check, shot };
 }
+async function dtccTests(D, tag, strip) {
+  const P = D.page, edges = () => P.evaluate(() => document.querySelectorAll(".mm-svg .mm-edge").length);
+  await D.click("Money map", strip); await sleep(200); await D.click("Everything", ".seg button"); await D.click("Money flows", ".seg button");
+  for (const id of ["dtcc", "ficc", "ficcgsd", "dtc", "fedwire", "dealers"]) {
+    if (!(await P.$(`[data-node="${id}"]`))) { errors.push(`${tag} node ${id} missing`); continue; }
+    await D.node(id); await sleep(150);
+    const card = await P.evaluate(() => [...document.querySelectorAll(".pc-h")].filter((e) => e.getClientRects().length).map((e) => e.textContent)[0]);
+    const srcN = await P.evaluate(() => [...document.querySelectorAll(".pc-src a")].filter((e) => e.getClientRects().length).length);
+    notes.push(`${tag} DTCC ${id}: lines=${await edges()} card="${card}" sources=${srcN}`);
+    await D.check(`dtcc node ${id}`);
+    if (["dtcc", "ficc", "dtc"].includes(id)) { await P.evaluate((id) => document.querySelector(`[data-node="${id}"]`).scrollIntoView({ block: "center", inline: "center" }), id); await sleep(200); await D.shot(`${tag}-dtcc-${id}`); }
+  }
+  for (const v of ["Agency", "Non-agency", "CRT"]) { await D.click(v, ".seg button"); await D.node("dtcc"); await sleep(120); notes.push(`${tag} DTCC in ${v}: lines=${await edges()}`); await D.check(`dtcc ${v}`); }
+  await D.click("Everything", ".seg button"); await D.click("Clear");
+  // ownership: holder of record
+  await D.click("Who owns it?", strip); await sleep(200);
+  for (const [route, step] of [["Fannie Mae swap", 3], ["Private-label", 3], ["Credit risk transfer", 2]]) {
+    await D.click(route, ".chip"); await P.evaluate((s) => document.querySelectorAll(".ob-dots button")[s].dispatchEvent(new MouseEvent("click", { bubbles: true })), step); await sleep(150);
+    const rec = await P.evaluate(() => [...document.querySelectorAll(".own-row")].filter((r) => r.getClientRects().length && r.textContent.includes("Holder of record")).map((r) => r.querySelector(".own-v").textContent)[0]);
+    const ben = await P.evaluate(() => [...document.querySelectorAll(".own-row")].filter((r) => r.getClientRects().length && r.textContent.includes("beneficial owner")).map((r) => r.querySelector(".own-v").textContent)[0]);
+    notes.push(`${tag} ${route} step ${step + 1}: holder of record = ${rec} | beneficial owners = ${ben}`);
+    if (!rec || rec === "nobody") errors.push(`${tag} ${route} step ${step + 1} has no holder of record`);
+    await D.check(`own ${route} record`);
+  }
+  await P.evaluate(() => document.querySelector(".ledger").scrollIntoView({ block: "center" })); await sleep(200); await D.shot(`${tag}-dtcc-ledger`);
+  await D.click("Fannie Mae swap", ".chip"); await P.evaluate(() => document.querySelectorAll(".ob-dots button")[2].dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(150);
+  // 2008 card
+  await D.click("2008: then vs now", strip); await sleep(200);
+  notes.push(`${tag} 2008 DTCC card: ${await P.evaluate(() => !![...document.querySelectorAll(".crisis-card .cc-h")].find((h) => h.textContent.includes("DTCC")))}; rulebook 2023 row: ${await P.evaluate(() => document.querySelector(".main").innerText.includes("June 30, 2027"))}`);
+  await P.evaluate(() => [...document.querySelectorAll(".crisis-card")].find((c) => c.textContent.includes("DTCC"))?.scrollIntoView({ block: "center" })); await sleep(200); await D.shot(`${tag}-dtcc-2008`); await D.check("2008 dtcc");
+  await D.click("Money map", strip); await sleep(200);
+}
 const ROLE_IDS = ["servicer", "pmi", "crt", "wholeloan", "whlender", "analyst", "aggregator"];
 const ROLE_NODES = { servicer: "servicer", mi: "pmi", cas: "crt", dealers: "wholeloan", warehouse: "whlender", rocket: "analyst", pennymac: "aggregator", msrowner: "aggregator", uwm: "analyst", creditinv: "crt" };
 async function roleTests(D, tag, strip) {
@@ -110,6 +142,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   await D.check("map default");
   await D.shot(`${tag}-map-default`);
   if (process.env.ONLY === "roles") { await roleTests(D, tag, strip); continue; }
+  if (process.env.ONLY === "dtcc") { await dtccTests(D, tag, strip); continue; }
   // views x overlays, select every node in each view to exercise hot labels
   for (const v of ["Everything", "Agency", "Non-agency", "CRT", "Servicing"]) {
     await D.click(v, ".seg button");
@@ -223,6 +256,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
     await D.shot(`${tag}-owner-chip-${k}`);
   }
   notes.push(`${tag} chip hover cursor: ${await D.page.evaluate(() => getComputedStyle(document.querySelector(".own-chip")).cursor)}; disabled bond chip at step 1: pending`);
+  await dtccTests(D, tag, strip);
   await roleTests(D, tag, strip);
   // mobile tabs / side panel
   if (tag === "mobile") { await D.click("Player", ".mtabs button"); await sleep(200); await D.check("mobile player tab"); await D.shot("mobile-player-tab"); await D.click("Glossary", ".mtabs button"); await D.check("mobile glossary tab"); await D.click("Explore", ".mtabs button"); }

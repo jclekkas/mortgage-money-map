@@ -178,13 +178,12 @@ export function MoneyMap({ view, overlay, risk, crisis, sel, onPick, own, animat
     <svg viewBox={`0 0 ${MAP_W} ${MAP_H}`} width={MAP_W} height={MAP_H} className="mm-svg" role="img" aria-label="Map of the US secondary mortgage market: who pays whom and who owns what">
       <defs>{(Object.keys(FLOW_KIND) as Flow["kind"][]).map((k) => <marker key={k} id={"mm-a-" + k} viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" markerUnits="strokeWidth" orient="auto"><path d="M0,0.5 L7.5,4 L0,7.5 z" style={{ fill: FLOW_KIND[k].color }} /></marker>)}</defs>
       {LANES.map((l, i) => <g key={l}><rect x={LX(i) - HALF - 6} y={30} width={NW + 12} height={MAP_H - 36} rx={10} className="mm-laneband" /><text x={LX(i)} y={20} textAnchor="middle" className="mm-lane">{l}</text></g>)}
-      <text x={LX(4)} y={RY(4) + 5} textAnchor="middle" className="mm-lane">SERVICING</text>
       {edges}
       {PLAYERS.map((p) => {
         const x = LX(p.lane) - NW / 2, y = RY(p.row) - NH / 2;
         const on = sel === p.id, ok = lit(p.id), kinds = own[p.id] ?? [], ownsLoan = kinds.includes("loan");
         const rc = overlay === "risk" && bearers[p.id] ? RISK[risk].color : null;
-        const cr = crisis && !!p.crisis;
+        const cr = crisis && !!p.crisis && !p.crisis.calm;
         return (
           <g key={p.id} className={"mm-node" + (on ? " on" : "") + (ok ? "" : " dim") + (flash === p.id ? " flash" : "")} transform={`translate(${x},${y})`} onClick={() => onPick(p.id)} tabIndex={0} role="button" aria-label={`${p.name}${kinds.length ? ", " + kinds.map((k) => OWN[k].short).join(", ") : ""}`} data-node={p.id} onKeyDown={(e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onPick(p.id); } }}>
             {credit && ok && REFRESH[p.id] && (() => { const t = Math.sqrt((wsOf[p.id] ?? 0) / maxWs), g = 3 + 10 * t; return <rect className="mm-heat" x={-g} y={-g} width={NW + 2 * g} height={NH + 2 * g} rx={10 + g} style={{ opacity: 0.12 + 0.6 * t }} />; })()}

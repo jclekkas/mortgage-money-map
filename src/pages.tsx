@@ -35,7 +35,8 @@ export function PlayerCard({ id, own, view, crisis, onPlay }: { id: string; own:
         { label: "Incentives (what they want)", value: p.incent },
         { label: "Risks they take", value: p.risks },
         { label: "Real examples", value: p.examples },
-        ...(p.crisis ? [{ label: <span className={crisis ? "down" : ""}>In 2008 (then)</span>, value: p.crisis.then }, { label: <span className={crisis ? "up" : ""}>What changed (now)</span>, value: p.crisis.now }] : []),
+        ...(p.src ? [{ label: "Sources", value: <span className="pc-src">{p.src.map(([t, u]) => <a key={u} href={u} target="_blank" rel="noreferrer">{t}</a>)}</span> }] : []),
+        ...(p.crisis ? [{ label: <span className={crisis && !p.crisis.calm ? "down" : ""}>In 2008 (then)</span>, value: p.crisis.then }, { label: <span className={crisis ? "up" : ""}>What changed (now)</span>, value: p.crisis.now }] : []),
       ]} />
       {(ins.length > 0 || outs.length > 0) && <>
         <div className="pc-sub">Money and paper in and out (this view)</div>
@@ -178,6 +179,7 @@ export function CrisisPage({ onMap }: { onMap: () => void }) {
           ["2014", <span key="q"><Term k="qm">QM/ATR (the safe-loan rulebook)</Term> takes effect</span>, "Lenders must verify income and debts; no more no-doc loans."],
           ["2016", <span key="r"><Term k="riskretention">Risk retention (skin in the game)</Term> for RMBS</span>, "Private-label sponsors keep 5% of the risk."],
           ["2019", <span key="u"><Term k="umbs">UMBS (one shared bond)</Term></span>, "Fannie Mae and Freddie Mac bonds become interchangeable."],
+          ["2023", <span key="t"><Term k="treasuryclearing">SEC Treasury clearing mandate (clear it centrally)</Term></span>, "Eligible Treasury cash trades must clear through a clearinghouse such as FICC by Dec. 31, 2026, and Treasury repo by June 30, 2027 (sourced: SEC). Agency MBS already clear at FICC's MBS Division."],
         ]} />
       </Panel>
     </>

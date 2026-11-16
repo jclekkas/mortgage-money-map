@@ -839,3 +839,5 @@ input[type=range] { width: 100%; accent-color: var(--accent); height: 18px; back
 .pc-play { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin: 8px 0 4px; font-size: 12px; }
 @media (max-width: 1100px) { .role-cols { grid-template-columns: minmax(0, 1fr); } }
 .role-tipbox { margin-top: 10px; padding: 8px 11px; border-radius: 8px; border: 1px solid var(--accent); background: color-mix(in srgb, var(--accent) 10%, transparent); font-size: 13px; line-height: 1.45; }
+.pc-src { display: flex; flex-direction: column; gap: 3px; }
+.pc-src a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; overflow-wrap: anywhere; }

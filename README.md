@@ -59,6 +59,36 @@ Stack: Vite + React 18 + TypeScript, no runtime dependencies beyond React, and s
 - With 10 or fewer lines shown, every line gets a label and appears in a "Lines shown" list.
 - The URL hash saves the view, overlay, selected player and line filter, so a filtered map can be shared as a link.
 
+## DTCC: clearing, settlement and custody
+
+DTCC, the Depository Trust & Clearing Corporation (the market's plumbing company), is now a full player with three arms on the map:
+
+- **FICC MBS Division** (the agency MBS clearinghouse):
+  - novation (it becomes buyer to every seller and seller to every buyer);
+  - netting of TBA trades, four times a month;
+  - margin and clearing fund deposits;
+  - clearing fees;
+  - EPN, Electronic Pool Notification (the 48-hour pool notice: sellers name the pools by 3 p.m. two business days before settlement).
+
+  Settlement happens on Fedwire (delivery versus payment).
+- **FICC Government Securities Division** (the Treasury and repo clearinghouse). The SEC's Treasury clearing mandate requires eligible cash trades to be centrally cleared by **Dec. 31, 2026** and eligible repo by **June 30, 2027** ([SEC](https://www.sec.gov/featured-topics/treasury-clearing-implementation)).
+- **DTC** (the securities vault). It holds private-label RMBS and CAS and STACR notes in book-entry form, registered to **Cede & Co.** (DTC's nominee). Monthly principal and interest goes from the trustee or paying agent to DTC, then to participants, then to investors. **Agency MBS are not at DTC**: they live on Fedwire (the Fed's book-entry register) ([24 CFR 350](https://www.ecfr.gov/current/title-24/subtitle-B/chapter-III/part-350)).
+
+The ownership tracker has a new role, **holder of record (N, pink)**: the name on the register, which is distinct from the beneficial owner (the real owner).
+- Cede & Co. is the holder of record for private-label and CRT bonds.
+- Fedwire keeps the register for agency MBS.
+- The ownership ledger has a "Holder of record" column.
+
+The line filter has a new **Clearing, settlement & custody** type, with 20 of the 121 lines.
+
+The 2008 page adds the Lehman close-out. FICC netted almost 90% of Lehman's $329 billion TBA book and closed out $190 billion of government securities trades, with no loss to other members' clearing funds ([DTCC, 2008](https://www.finextra.com/pressarticle/24287/dtcc-closes-out-lehman-bankruptcy)).
+
+DTCC figures for 2025 (approx., sourced from DTCC):
+- approx. $4.7 quadrillion of transactions processed;
+- approx. $114 trillion held in custody at DTC;
+- approx. $82 trillion of MBS trade value netted at the MBS Division;
+- FICC's average daily volume reached approx. $11.9 trillion by the end of 2025.
+
 ## Play a role
 
 Page 7, **Play a role**, turns the map into seven short games. Each runs 5 to 8 quarters (3-month turns). You can also open a game from a player card on the map with **Play this role**:
