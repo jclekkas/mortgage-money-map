@@ -58,3 +58,31 @@ Stack: Vite + React 18 + TypeScript, no runtime dependencies beyond React, and s
 - Click any arrow to get **Show only this line** or **Hide this line**.
 - With 10 or fewer lines shown, every line gets a label and appears in a "Lines shown" list.
 - The URL hash saves the view, overlay, selected player and line filter, so a filtered map can be shared as a link.
+
+## Play a role
+
+Page 7, **Play a role**, turns the map into seven short games. Each runs 5 to 8 quarters (3-month turns). You can also open a game from a player card on the map with **Play this role**:
+
+| Role | Map box | Quarters | Your main levers | Shocks |
+|---|---|---|---|---|
+| Servicer (payment collector) | Servicers | 8 | portfolio credit refresh, refi outreach, advance funding, sell MSRs, rate hedge | rates drop, rates spike, delinquency rise, forbearance wave |
+| Private mortgage insurer, PMI (first-loss insurer) | Mortgage insurers | 8 | premium price, FICO and LTV limits, quota share or insurance-linked notes, refresh | home prices fall, unemployment spike |
+| CRT investor (buyer of credit risk bonds) | CAS & STACR notes | 6 | tranche (M1 to B2), bid, refreshed loan data, hold, trim, sell or add | home prices -10% or -20%, risk-off spread widening |
+| Whole loan trader | Dealers | 5 | bid, diligence depth, credit refresh, flip or securitize | rates up or down, diligence findings, spread widening |
+| Warehouse lender (bank lending to lenders) | Warehouse lenders | 6 | which clients to fund, advance rate, spread, covenants, aging limits, margin calls, collateral refresh | client volume collapse, stuck loans, a run on a client |
+| Warehouse line analyst at a large lender | Rocket Mortgage / UWM | 7 | split across three bank lines, early funding or gestation repo, cash cushion, pipeline hedge, pre-close refresh | a bank cuts its line, rates up (lock losses), rates down (fallout) |
+| Aggregator buying or selling MSRs | PennyMac / MSR investors | 7 | bid on a $20B MSR package, sell 20%, refresh the package, MSR line leverage, hedge | rates fall 1%, rates rise 1%, delinquency spike |
+
+Each game has:
+- a plain-English intro covering the job, who you work with, how you get paid and how you win, plus key terms you can tap;
+- decisions with "?" explanations;
+- a live dashboard showing P&L by quarter, where the money came from, and risk readings that turn green, amber or red;
+- a mini map highlighting your box;
+- a scorecard with a grade, your choices next to what a pro would choose, the pro playbook and lessons.
+
+When your credit refresh is switched on, you get early warning before credit shocks. The scorecard links each role back to the refresh opportunity sizing on the Credit checks page.
+
+The scenario options are random shocks, a calm market, or one chosen shock in quarter 3. A seed makes every game replayable: the same seed and the same choices always give the same result, on any device. The URL hash remembers the open role (`r=`).
+
+All game figures are **mock and illustrative**, not any firm's terms, prices or results. Named firms appear only as examples of a role. The game engine is in `src/roles.ts` and the page is `src/rolePage.tsx`.
+

@@ -43,10 +43,10 @@ export function applyFilter(u: Flow[], lf: LineFilter): Flow[] {
 }
 
 // ---------- URL hash ----------
-export type HashState = { page?: number; view?: ViewSel; overlay?: Overlay; sel?: string; apath?: AgencyPath; step?: number; lf?: LineFilter };
-export function encodeHash(s: Required<Omit<HashState, "lf">> & { lf: LineFilter }): string {
+export type HashState = { page?: number; view?: ViewSel; overlay?: Overlay; sel?: string; apath?: AgencyPath; step?: number; lf?: LineFilter; role?: string };
+export function encodeHash(s: Required<Omit<HashState, "lf" | "role">> & { lf: LineFilter; role?: string }): string {
   const q = new URLSearchParams();
-  q.set("p", String(s.page)); q.set("v", s.view); q.set("o", s.overlay); if (s.sel) q.set("s", s.sel); q.set("ap", s.apath); q.set("st", String(s.step));
+  q.set("p", String(s.page)); q.set("v", s.view); q.set("o", s.overlay); if (s.sel) q.set("s", s.sel); q.set("ap", s.apath); q.set("st", String(s.step)); if (s.role) q.set("r", s.role);
   const lf = s.lf;
   if (lf.custom) {
     q.set("L", "1");
@@ -62,11 +62,12 @@ export function decodeHash(h: string): HashState {
   if (!q.has("v") && !q.has("L")) return {};
   const out: HashState = {};
   const views = ["all", "agency", "nonagency", "crt", "servicing"], ovs = ["money", "owner", "risk", "credit"];
-  if (q.has("p")) out.page = Math.max(0, Math.min(7, Number(q.get("p")) || 0));
+  if (q.has("p")) out.page = Math.max(0, Math.min(8, Number(q.get("p")) || 0));
   if (views.includes(q.get("v") ?? "")) out.view = q.get("v") as ViewSel;
   if (ovs.includes(q.get("o") ?? "")) out.overlay = q.get("o") as Overlay;
   if (q.get("s") && P[q.get("s") as string]) out.sel = q.get("s") as string;
   if (["swap", "cash", "ginnie"].includes(q.get("ap") ?? "")) out.apath = q.get("ap") as AgencyPath;
+  if (/^[a-z]{2,20}$/.test(q.get("r") ?? "")) out.role = q.get("r") as string;
   if (q.has("st")) out.step = Math.max(0, Number(q.get("st")) || 0);
   if (q.get("L") === "1") {
     const nums = (k: string) => (q.get(k) ?? "").split(".").filter(Boolean).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n < ALL.length);

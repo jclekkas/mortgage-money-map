@@ -12,10 +12,12 @@ import { Panel, Seg, Switch, Term } from "./ui";
 import { BASE_ASSUMP, HUBS, ORIG, REFRESH, calc } from "./credit";
 import type { Assump } from "./credit";
 import { CreditCard, CreditLegend, CreditPage, LifeStrip, RefreshTop } from "./creditPages";
+import { RolePage } from "./rolePage";
+import { ROLE } from "./roles";
 import { CrisisPage, Glossary, OneDollar, OwnBadges, OwnLegend, PlayerCard, Quiz, RiskPage, namesOf } from "./pages";
 
 const ls = { get: (k: string) => { try { return localStorage.getItem(k); } catch { return null; } }, set: (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* ignore */ } } };
-const PAGES: [string, string][] = [["Money map", "follow the money"], ["Who owns it?", "loan vs bond, step by step"], ["Follow one payment", "where your dollar goes"], ["Who takes which risk", "credit, prepay, rates, cash"], ["2008: then vs now", "what broke, what changed"], ["Credit checks", "refresh opportunities, sized"], ["Glossary", "every term, in plain English"], ["Check yourself", `${QUIZ.length}-question quiz`]];
+const PAGES: [string, string][] = [["Money map", "follow the money"], ["Who owns it?", "loan vs bond, step by step"], ["Follow one payment", "where your dollar goes"], ["Who takes which risk", "credit, prepay, rates, cash"], ["2008: then vs now", "what broke, what changed"], ["Credit checks", "refresh opportunities, sized"], ["Play a role", "7 jobs, quarter by quarter"], ["Glossary", "every term, in plain English"], ["Check yourself", `${QUIZ.length}-question quiz`]];
 const VIEW_EXPLAIN: Record<ViewSel, ReactNode> = {
   all: <>Every player at once. Pick a view above to focus on one part of the market. Most US mortgages travel the <b>agency</b> route: lenders sell them to Fannie Mae or Freddie Mac (the agency guarantors), or pool them under Ginnie Mae (the government guarantor), and the loans become <Term k="mbs">mortgage-backed securities, MBS (bonds made of mortgages)</Term>.</>,
   agency: <>The government-backed highway. Lenders swap or sell loans to Fannie Mae and Freddie Mac (the agency guarantors) or pool FHA and VA loans under Ginnie Mae (the government guarantor). The bonds trade in the <Term k="tba">TBA market (forward orders for generic bonds)</Term>, the guarantors earn a <Term k="gfee">guarantee fee, g-fee (insurance premium)</Term>, and investors take rate and prepayment risk but not credit risk.</>,
@@ -39,6 +41,8 @@ export default function App() {
   const [crisis, setCrisis] = useState(false);
   const [animate, setAnimate] = useState(true);
   const [sel, setSel] = useState(H.sel ?? "");
+  const [roleId, setRoleId] = useState(H.role && ROLE[H.role] ? H.role : "");
+  const playRole = (id: string) => { setRoleId(id); setPage(6); setMtab("main"); };
   const [assump, setAssump] = useState<Assump>(BASE_ASSUMP);
   const rows = useMemo(() => calc(assump), [assump]);
   const hasCredit = (id: string) => !!(REFRESH[id] || ORIG[id] || HUBS[id]);
@@ -69,7 +73,7 @@ export default function App() {
     const t = setTimeout(() => setFlash(null), 2600);
     return () => { cancelAnimationFrame(r); clearTimeout(t); };
   }, [flash?.n]); // eslint-disable-line
-  useEffect(() => { const h = encodeHash({ page, view, overlay, sel, apath, step: si, lf }); try { history.replaceState(null, "", "#" + h); } catch { /* ignore */ } }, [page, view, overlay, sel, apath, si, lf]);
+  useEffect(() => { const h = encodeHash({ page, view, overlay, sel, apath, step: si, lf, role: page === 6 ? roleId : "" }); try { history.replaceState(null, "", "#" + h); } catch { /* ignore */ } }, [page, view, overlay, sel, apath, si, lf, roleId]);
   const uni = useMemo(() => universe(view), [view]);
   const shownFlows = selectFlows({ view, overlay, sel, focus: [...Object.keys(st.own), "borrower"], show: st.show, lines: lf.custom ? applyFilter(uni, lf) : null });
   // When only a few lines show, scroll the sideways-scrolling map (mobile) so they're in view.
@@ -96,6 +100,7 @@ export default function App() {
     { sel: "map", title: "Follow the warehouse line too", body: "Most loans are made by nonbank lenders that don't have the cash themselves. They draw on a warehouse line (the lender's credit line) from banks like JPMorgan, Wells Fargo or Texas Capital, pledge the new loan as collateral, and repay the line when the loan is sold. Click Warehouse lenders to see the loop; the cyan C badge means 'holds as collateral, not owner'." },
     { sel: "controls", title: "Where could credit be refreshed?", body: "Pick the Credit refreshes overlay. Every player that holds or carries risk on an existing loan gets a gauge: the dot is how often borrowers' credit is checked today, the ring is how often it plausibly could be, and the glow shows the dollar gap (estimates). Hard pulls at application are still marked, but they're the crowded part of the market." },
     { sel: "side", title: "The player card", body: "What they do, how they get paid, their incentives and risks, real examples, and every dollar in and out. The Glossary tab explains every term." },
+    { sel: "rail", title: "Play a role", body: "Open Play a role (or press Play this role on a player card) to run a servicer, mortgage insurer, CRT investor, whole loan trader, warehouse lender, a lender's warehouse line analyst or an MSR aggregator for 5 to 8 quarters. Make the calls, survive the shocks, and see what a pro and a credit refresh would have done. All numbers are mock." },
     { sel: "rail", title: "More ways to learn", body: "Step through ownership, follow one monthly payment, see the risk matrix, compare 2008 with today, and test yourself. Replay this tour anytime with the Tour button." },
   ];
   const startTour = () => { setPage(0); setMtab("main"); setTour(0); };
@@ -185,7 +190,7 @@ export default function App() {
         </Panel>
         <Panel title={`What the ${VIEW_SHORT[view].toLowerCase()} view shows`}><div className="p">{VIEW_EXPLAIN[view]}</div></Panel>
       </div>
-      <div className="m-only" style={{ marginTop: 12 }}><Panel title="Selected player">{sel && overlay === "credit" && hasCredit(sel) && <CreditCard id={sel} rows={rows} />}{sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /> : <div className="p dim">Tap any box on the map to see what that player does, how it gets paid and what it owns.</div>}</Panel></div>
+      <div className="m-only" style={{ marginTop: 12 }}><Panel title="Selected player">{sel && overlay === "credit" && hasCredit(sel) && <CreditCard id={sel} rows={rows} />}{sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} onPlay={playRole} /> : <div className="p dim">Tap any box on the map to see what that player does, how it gets paid and what it owns.</div>}</Panel></div>
     </>
   );
 
@@ -239,6 +244,7 @@ export default function App() {
     <><div className="ws-head"><div><div className="crumb">Who takes which risk</div><h1>Four risks, and who carries each</h1></div></div><RiskPage onShow={(k) => { setRisk(k); setOverlay("risk"); setPage(0); }} /></>,
     <><div className="ws-head"><div><div className="crumb">2008: then vs now</div><h1>What broke, and what changed</h1></div></div><CrisisPage onMap={() => { setCrisis(true); setPage(0); }} /></>,
     <><div className="ws-head"><div><div className="crumb">Credit checks</div><h1>Credit checks and refresh opportunities</h1></div></div><CreditPage rows={rows} a={assump} setA={setAssump} onShow={showCredit} /></>,
+    <><div className="ws-head"><div><div className="crumb">Play a role</div><h1>{roleId ? ROLE[roleId].title : "Play a role in the market"}</h1></div></div><RolePage roleId={roleId} setRoleId={setRoleId} onCredit={() => setPage(5)} onMap={(id) => { setOverlay("money"); showOnMap(id); }} /></>,
     <><div className="ws-head"><div><div className="crumb">Glossary</div><h1>Every term, in plain English</h1></div></div><Panel><Glossary q={gq} setQ={setGq} /></Panel></>,
     <><div className="ws-head"><div><div className="crumb">Check yourself</div><h1>Quick quiz</h1></div></div><Quiz ans={quiz} setAns={setQuiz} /></>,
   ];
@@ -272,7 +278,7 @@ export default function App() {
           {(mtab === "glossary" || (mtab === "main" && sideTab === "glossary")) ? <Glossary q={gq} setQ={setGq} /> : <>
             <div className="chips side-pick">{["borrower", "rocket", "warehouse", "fannie", "ginnie", "agencytrust", "servicer", "managers", "cas"].map((id) => <button key={id} className={"chip" + (sel === id ? " on" : "")} onClick={() => pick(id)}>{P[id].label}</button>)}</div>
             {sel && overlay === "credit" && hasCredit(sel) && <CreditCard id={sel} rows={rows} />}
-            {sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} /> : <div className="pcard"><div className="pc-h">Pick a player</div><div className="p">Click any box on the map, or a name above, to see what that player does, how it gets paid, its incentives and risks, real examples, and every dollar in and out.</div><div className="p dim">Tip: Warehouse lenders (the lender's credit line) fund most closings before a loan is ever sold.</div></div>}
+            {sel ? <PlayerCard id={sel} own={st.own} view={view} crisis={crisis} onPlay={playRole} /> : <div className="pcard"><div className="pc-h">Pick a player</div><div className="p">Click any box on the map, or a name above, to see what that player does, how it gets paid, its incentives and risks, real examples, and every dollar in and out.</div><div className="p dim">Tip: Warehouse lenders (the lender's credit line) fund most closings before a loan is ever sold.</div></div>}
           </>}
         </div>
       </aside>

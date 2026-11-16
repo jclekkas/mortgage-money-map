@@ -37,6 +37,68 @@ async function open(tag, vp) {
   const shot = (name) => page.screenshot({ path: `${SHOTS}/${name}.png` });
   return { page, click, node, check, shot };
 }
+const ROLE_IDS = ["servicer", "pmi", "crt", "wholeloan", "whlender", "analyst", "aggregator"];
+const ROLE_NODES = { servicer: "servicer", mi: "pmi", cas: "crt", dealers: "wholeloan", warehouse: "whlender", rocket: "analyst", pennymac: "aggregator", msrowner: "aggregator", uwm: "analyst", creditinv: "crt" };
+async function roleTests(D, tag, strip) {
+  const P = D.page, T = (id) => `[data-testid="${id}"]`;
+  const tclick = async (sel, i = 0) => { const ok = await P.evaluate((sel, i) => { const b = [...document.querySelectorAll(sel)].filter((x) => x.getClientRects().length)[i]; if (b) { b.dispatchEvent(new MouseEvent("click", { bubbles: true })); return true; } return false; }, sel, i); if (!ok) errors.push(`${tag} could not click ${sel}#${i}`); await sleep(90); return ok; };
+  const setVal = (sel, v) => P.evaluate((sel, v) => { const el = document.querySelector(sel); const proto = el.tagName === "SELECT" ? HTMLSelectElement.prototype : HTMLInputElement.prototype; Object.getOwnPropertyDescriptor(proto, "value").set.call(el, String(v)); el.dispatchEvent(new Event(el.tagName === "SELECT" ? "change" : "input", { bubbles: true })); }, sel, v);
+  const into = async (sel) => { await P.evaluate((sel) => document.querySelector(sel)?.scrollIntoView({ block: "start" }), sel); await sleep(150); };
+  const total = () => P.evaluate(() => document.querySelector('[data-testid="role-total"]')?.textContent ?? "NONE");
+  const playDefaults = async () => { for (let q = 0; q < 9 && await P.$(T("role-run")); q++) await tclick(T("role-run")); };
+  await D.click("Play a role", strip); await sleep(250);
+  if (await P.$(".role-top")) await D.click("All roles");
+  await D.check("roles picker"); await P.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await D.shot(`${tag}-role-picker`);
+  for (const id of ROLE_IDS) {
+    await tclick(T("role-pick-" + id)); await sleep(150);
+    await D.check(`role ${id} intro`);
+    await P.evaluate(() => document.querySelector(".role-terms .term")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(100); await D.check(`role ${id} term tip`); await P.evaluate(() => document.body.dispatchEvent(new MouseEvent("click", { bubbles: true })));
+    if (id === "servicer" || id === "analyst") { await P.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await D.shot(`${tag}-role-${id}-intro`); }
+    await setVal(T("role-scn"), "random"); await setVal(T("role-seed"), 7); await sleep(80);
+    await tclick(T("role-start")); await sleep(150);
+    const nq = await P.evaluate(() => document.querySelectorAll(".role-prog i").length);
+    let warned = 0;
+    for (let q = 0; q < nq; q++) {
+      if (!(await P.$(T("role-run")))) { errors.push(`${tag} ${id} no run button at Q${q + 1}`); break; }
+      if (await P.$(T("role-warn"))) warned++;
+      const keys = await P.evaluate(() => [...document.querySelectorAll('[data-testid^="role-d-"]')].map((d) => [d.getAttribute("data-testid"), d.querySelectorAll(".seg button").length]));
+      for (const [k, n] of keys) if (n) await tclick(`[data-testid="${k}"] .seg button`, (q + k.length) % n);
+      if (q === 0) { await tclick(`[data-testid="${keys[0][0]}"] .rd-q`); await D.check(`role ${id} tip`); }
+      await D.check(`role ${id} Q${q + 1} decisions`);
+      if (q === 2) { await into(".role-prog"); await D.shot(`${tag}-role-${id}-play`); if (tag === "desktop") { await into(".role-dash"); await D.shot(`${tag}-role-${id}-dashboard`); } }
+      await tclick(T("role-run")); await sleep(120);
+      await D.check(`role ${id} after Q${q + 1}`);
+    }
+    const sc = await P.$(T("role-score"));
+    if (!sc) errors.push(`${tag} ${id} no scorecard`);
+    const g = await P.evaluate(() => `${document.querySelector(".rs-grade")?.textContent} ${document.querySelector(".rs-n")?.textContent}`);
+    const t1 = await total();
+    await D.check(`role ${id} scorecard`); await into(".role-score"); await D.shot(`${tag}-role-${id}-score`);
+    // determinism: same seed + default decisions twice -> same total
+    await tclick(T("role-replay")); await playDefaults(); const a = await total();
+    await tclick(T("role-replay")); await playDefaults(); const b = await total();
+    if (a !== b || a === "NONE") errors.push(`${tag} ${id} not deterministic: ${a} vs ${b}`);
+    notes.push(`${tag} role ${id}: ${nq} quarters, varied play total ${t1} grade ${g}, early warnings ${warned}; defaults seed 7 total ${a} == ${b}`);
+    await tclick(T("role-newseed")); await playDefaults(); await D.check(`role ${id} new seed`);
+    notes.push(`${tag} role ${id} new seed total ${await total()}`);
+    await D.click("All roles");
+  }
+  // entry points: player card "Play this role"
+  await D.click("Money map", strip); await sleep(250); await D.click("Everything", ".seg button"); await D.click("Money flows", ".seg button");
+  if (await P.$(".lf-count-bar, [data-testid=lf-count-bar]")) { /* filter state left from earlier tests */ }
+  for (const [node, rid] of Object.entries(ROLE_NODES)) {
+    if (!(await P.$(`[data-node="${node}"]`))) { errors.push(`${tag} entry node ${node} missing`); continue; }
+    await D.node(node); await sleep(120);
+    if (tag === "mobile") await P.evaluate(() => document.querySelector('.m-only [data-testid="play-role"]')?.scrollIntoView({ block: "center" }));
+    const ok = await tclick(T("play-role")); await sleep(250);
+    const r = await P.evaluate(() => [document.querySelector(".stage-strip .chip.on")?.textContent, document.querySelector(".main h1")?.textContent, location.hash.match(/r=([a-z]+)/)?.[1]]);
+    if (!ok || !r[0]?.includes("Play a role") || r[2] !== rid) errors.push(`${tag} entry ${node} -> ${JSON.stringify(r)} expected ${rid}`);
+    if (node === "warehouse") { await D.check("entry warehouse"); await P.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await D.shot(`${tag}-role-entry-warehouse`); }
+    await D.click("Money map", strip); await sleep(200);
+  }
+  notes.push(`${tag} entry points tested: ${Object.keys(ROLE_NODES).length}`);
+  if (tag === "desktop") { await D.node("pennymac"); await sleep(150); await D.shot("desktop-playercard-play-button"); }
+}
 for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stage-strip button"], ["mobile", { width: 390, height: 844, isMobile: true, hasTouch: true, deviceScaleFactor: 2 }, ".stage-strip button"]]) {
   const D = await open(tag, vp);
   notes.push(`${tag} first-visit tour: ${await D.page.evaluate(() => document.querySelector(".tour-card h4")?.textContent)}`);
@@ -46,6 +108,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
   await D.click("Skip tour", ".tour-card button");
   await D.check("map default");
   await D.shot(`${tag}-map-default`);
+  if (process.env.ONLY === "roles") { await roleTests(D, tag, strip); continue; }
   // views x overlays, select every node in each view to exercise hot labels
   for (const v of ["Everything", "Agency", "Non-agency", "CRT", "Servicing"]) {
     await D.click(v, ".seg button");
@@ -126,7 +189,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
     notes.push(`${tag} after reset: ${await bar()}`);
   }
   // other pages
-  const pages = ["Who owns it?", "Follow one payment", "Who takes which risk", "2008: then vs now", "Credit checks", "Glossary", "Check yourself"];
+  const pages = ["Who owns it?", "Follow one payment", "Who takes which risk", "2008: then vs now", "Credit checks", "Play a role", "Glossary", "Check yourself"];
   for (const [i, p] of pages.entries()) {
     await D.click(p, strip); await sleep(250);
     if (p === "Who owns it?") { for (const r of ["Fannie Mae swap", "Cash window", "Ginnie Mae", "Private-label", "Credit risk transfer", "Servicing rights"]) { await D.click(r, ".chip"); const n = await D.page.evaluate(() => document.querySelectorAll(".ob-dots button").length); for (let s = 0; s < n; s++) { await D.page.evaluate((s) => document.querySelectorAll(".ob-dots button")[s].dispatchEvent(new MouseEvent("click", { bubbles: true })), s); await sleep(50); await D.check(`own ${r} step ${s + 1}`); } } await D.click("Fannie Mae swap", ".chip"); await D.page.evaluate(() => document.querySelectorAll(".ob-dots button")[2].dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(200); }
@@ -159,6 +222,7 @@ for (const [tag, vp, strip] of [["desktop", { width: 1440, height: 900 }, ".stag
     await D.shot(`${tag}-owner-chip-${k}`);
   }
   notes.push(`${tag} chip hover cursor: ${await D.page.evaluate(() => getComputedStyle(document.querySelector(".own-chip")).cursor)}; disabled bond chip at step 1: pending`);
+  await roleTests(D, tag, strip);
   // mobile tabs / side panel
   if (tag === "mobile") { await D.click("Player", ".mtabs button"); await sleep(200); await D.check("mobile player tab"); await D.shot("mobile-player-tab"); await D.click("Glossary", ".mtabs button"); await D.check("mobile glossary tab"); await D.click("Explore", ".mtabs button"); }
   else { await D.click("Glossary", ".side-tabs .tab"); await D.check("side glossary"); await D.click("Player", ".side-tabs .tab"); }

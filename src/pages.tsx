@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ROLE, ROLE_FOR_NODE } from "./roles";
 import type { ReactNode } from "react";
 import { P, OWN, PLAYERS, RISK, RISK_BEARERS, CRISIS, G, QUIZ, DISCLAIMER, FLOW_KIND } from "./data";
 import type { OwnKind, RiskKey, OwnStep } from "./data";
@@ -17,7 +18,8 @@ export function OwnLegend({ compact }: { compact?: boolean }) {
   return <div className={"legend own-legend" + (compact ? " compact" : "")}>{(Object.keys(OWN) as OwnKind[]).map((k) => <span key={k}><i className="own-dot" style={{ background: OWN[k].color }}>{OWN[k].glyph}</i>{OWN[k].label}</span>)}<span><i className="own-ring-sw" />Glowing box: owns the loan right now</span></div>;
 }
 
-export function PlayerCard({ id, own, view, crisis }: { id: string; own: Record<string, OwnKind[]>; view: ViewSel; crisis: boolean }) {
+export function PlayerCard({ id, own, view, crisis, onPlay }: { id: string; own: Record<string, OwnKind[]>; view: ViewSel; crisis: boolean; onPlay?: (roleId: string) => void }) {
+  const roleId = ROLE_FOR_NODE[id];
   const p = P[id];
   const fl = flowsFor(view);
   const ins = fl.filter((f) => f.to === id), outs = fl.filter((f) => f.from === id);
@@ -25,6 +27,7 @@ export function PlayerCard({ id, own, view, crisis }: { id: string; own: Record<
     <div className="pcard">
       <div className="pc-h">{p.name}</div>
       <div className="pc-own"><span className="dim">Right now this player: </span><OwnBadges kinds={own[id] ?? []} /></div>
+      {roleId && onPlay && <div className="pc-play"><button className="btn sm primary" data-testid="play-role" onClick={() => onPlay(roleId)}>{"\u25B6"} Play this role</button><span className="dim">{ROLE[roleId].short}: a {ROLE[roleId].quarters}-quarter game</span></div>}
       <Props items={[
         { label: "What they do", value: p.does },
         { label: "Think of it like", value: p.like },
