@@ -11,7 +11,7 @@ export type Dec = Record<string, string>;
 export type StepOut = { s: St; parts: Record<string, number>; risks: Record<string, number>; note: string };
 export type Role = {
   id: string; title: string; short: string; node: string; example: string; blurb: string;
-  intro: { job: string; work: string; paid: string; goal: string };
+  intro: { job: string; work: string; paid: string; goal: string; tip?: string };
   quarters: number; decisions: Decision[]; shocks: Shock[]; risks: RiskDef[];
   init: () => St;
   offer?: (t: number, seed: number) => string;
@@ -86,6 +86,7 @@ const servicer: Role = {
     work: "Fannie Mae and Freddie Mac (the agency guarantors) set the rules; Equifax, Experian and TransUnion (the credit bureaus) sell you refreshes; a bank lends against your advances; dealers sell you hedges.",
     paid: "A servicing fee strip (the collector's cut) of 0.25% a year on the loans' balance, plus float on escrow. Your mortgage servicing right, MSR (the right to collect the fee), is an asset that rises when rates rise and falls when rates fall, because borrowers refinance away.",
     goal: "Make money over 8 quarters without running out of cash (liquidity) and without letting a rate drop wipe out your MSR value.",
+    tip: "Hedging protects you if rates fall: falling rates set off refinances that shrink your servicing value. The game starts you with a half hedge; switch it off to feel the full risk.",
   },
   quarters: 8,
   decisions: [
@@ -93,7 +94,7 @@ const servicer: Role = {
     { key: "outreach", label: "Recapture outreach (calling your own borrowers before a rival refinances them)", tip: "When borrowers refinance, the loan and your fee leave. Recapture means you make the new loan yourself and keep the customer.", opts: [{ v: "off", label: "Off" }, { v: "standard", label: "Standard" }, { v: "aggressive", label: "Aggressive" }], def: "standard" },
     { key: "advance", label: "Funding advances (paying investors when borrowers don't)", tip: "Servicing advances: you must pay bondholders and tax bills even when a borrower misses a payment. Fund from your own cash, or borrow on an advance financing line (a bank loan against advances) at approx. SOFR + 2.5% (mock).", opts: [{ v: "cash", label: "Own cash" }, { v: "line", label: "Advance line" }], def: "cash" },
     { key: "msr", label: "MSR sale (sell part of your servicing rights)", tip: "Sell 25% of your MSR this quarter to an MSR investor such as Rithm Capital (the MSR investor) at a small discount. Raises cash, shrinks future fees.", opts: [{ v: "keep", label: "Keep" }, { v: "sell25", label: "Sell 25% now" }], def: "keep", once: true },
-    { key: "hedge", label: "MSR hedge (insurance against falling rates)", tip: "Buy interest-rate hedges (TBA or swaps) that gain when rates fall, offsetting the MSR's loss. Costs carry each quarter.", opts: [{ v: "none", label: "None" }, { v: "half", label: "Half" }, { v: "full", label: "Full" }], def: "none" },
+    { key: "hedge", label: "MSR hedge (insurance against falling rates)", tip: "Buy interest-rate hedges (TBA or swaps) that gain when rates fall, offsetting the MSR's loss. Costs carry each quarter.", opts: [{ v: "none", label: "None" }, { v: "half", label: "Half" }, { v: "full", label: "Full" }], def: "half" },
   ],
   shocks: [
     { id: "ratedrop", label: "Rates drop 1% (prepayment wave)", desc: "Mortgage rates fall about 1 percentage point. Borrowers rush to refinance: your loans pay off and your MSR loses value." },
@@ -152,13 +153,14 @@ const pmi: Role = {
     work: "Lenders such as Rocket Mortgage (the retail lender) choose you on price; Fannie Mae and Freddie Mac (the agency guarantors) set your capital rule, PMIERs (the insurers' capital test); reinsurers and bond investors take part of your risk.",
     paid: "Monthly premiums from borrowers, set by a grid of credit score (FICO) and loan-to-value, LTV (loan size vs home value).",
     goal: "Earn premiums over 8 quarters while keeping PMIERs sufficiency (capital vs required) above 100%, even if home prices fall.",
+    tip: "Reinsurance protects you if home prices fall. The game starts you with insurance-linked notes (bond investors take big losses above a level); drop it to keep more premium and more risk.",
   },
   quarters: 8,
   decisions: [
     { key: "price", label: "Premium grid (price per FICO/LTV cell)", tip: "Cheap wins more lenders' business but attracts riskier loans; rich wins less but each policy pays more.", opts: [{ v: "cheap", label: "Cheap" }, { v: "market", label: "Market" }, { v: "rich", label: "Rich" }], def: "market" },
     { key: "fico", label: "Minimum credit score, FICO (underwriting cutoff)", tip: "Loans below this score are declined. Higher cutoffs mean fewer, safer loans.", opts: [{ v: "620", label: "620" }, { v: "680", label: "680" }, { v: "720", label: "720" }], def: "680" },
     { key: "ltv", label: "Maximum loan-to-value, LTV (smallest down payment you'll insure)", tip: "97% LTV = 3% down. Lower maximums mean bigger cushions when prices fall.", opts: [{ v: "97", label: "97%" }, { v: "95", label: "95%" }, { v: "90", label: "90%" }], def: "95" },
-    { key: "reins", label: "Reinsurance (insurance for the insurer)", tip: "Quota share: give a reinsurer 25% of premiums and losses. Insurance-linked notes, ILN (bonds that absorb losses above a level): pay a premium, bond investors cover big losses. Both lower the capital PMIERs requires.", opts: [{ v: "none", label: "None" }, { v: "qs", label: "Quota share 25%" }, { v: "iln", label: "ILN (excess loss)" }], def: "none" },
+    { key: "reins", label: "Reinsurance (insurance for the insurer)", tip: "Quota share: give a reinsurer 25% of premiums and losses. Insurance-linked notes, ILN (bonds that absorb losses above a level): pay a premium, bond investors cover big losses. Both lower the capital PMIERs requires.", opts: [{ v: "none", label: "None" }, { v: "qs", label: "Quota share 25%" }, { v: "iln", label: "ILN (excess loss)" }], def: "iln" },
     { key: "refresh", label: "Credit refresh monitoring on the insured book", tip: REFRESH_TIP + " Better reserving and earlier loss mitigation on loans going bad.", opts: [{ v: "none", label: "None" }, { v: "annual", label: "Annual" }, { v: "quarterly", label: "Quarterly" }], def: "annual" },
   ],
   shocks: [
@@ -207,12 +209,13 @@ const crt: Role = {
     work: "Fannie Mae or Freddie Mac (the issuers) and dealers such as JPMorgan (the market maker) sell the notes; Equifax (the credit bureau) supplies refreshed credit scores on CAS reference pools.",
     paid: "A coupon of SOFR plus a spread. Junior tranches (B-2, B-1) pay much more but take the first losses; mezzanine (M-2) and senior-ish (M-1) pay less and are safer.",
     goal: "Collect coupons over 6 quarters without big writedowns. Use the data to trim before stress if you can see it coming.",
+    tip: "Start in M-1, the safest tranche. Lower tranches pay more spread but lose principal first when home prices fall. Refreshed scores are on, so you can trim before losses arrive.",
   },
   quarters: 6,
   decisions: [
-    { key: "tranche", label: "Tranche (which floor of losses you take)", tip: "Attachment and detachment points (where your losses start and end) as % of the pool, mock: B-2 0–0.5%, B-1 0.5–1%, M-2 1–2.5%, M-1 2.5–4%.", opts: [{ v: "M1", label: "M-1 (safest)" }, { v: "M2", label: "M-2" }, { v: "B1", label: "B-1" }, { v: "B2", label: "B-2 (first loss)" }], def: "M2", lock: true },
+    { key: "tranche", label: "Tranche (which floor of losses you take)", tip: "Attachment and detachment points (where your losses start and end) as % of the pool, mock: B-2 0–0.5%, B-1 0.5–1%, M-2 1–2.5%, M-1 2.5–4%.", opts: [{ v: "M1", label: "M-1 (safest)" }, { v: "M2", label: "M-2" }, { v: "B1", label: "B-1" }, { v: "B2", label: "B-2 (first loss)" }], def: "M1", lock: true },
     { key: "bid", label: "Your bid (price vs the deal's spread)", tip: "Tight: accept a lower spread to get your full order. Wide: demand more spread but get only part of the bonds.", opts: [{ v: "tight", label: "Tight (full order)" }, { v: "market", label: "At market" }, { v: "wide", label: "Wide (partial fill)" }], def: "market", lock: true },
-    { key: "data", label: "Refreshed FICO data on the reference pool", tip: REFRESH_TIP + " Fannie Mae has published monthly refreshed scores on CAS deals since 2016 (sourced). Here it costs a little and warns you a quarter before stress shows up.", opts: [{ v: "off", label: "Don't use" }, { v: "on", label: "Use it" }], def: "off" },
+    { key: "data", label: "Refreshed FICO data on the reference pool", tip: REFRESH_TIP + " Fannie Mae has published monthly refreshed scores on CAS deals since 2016 (sourced). Here it costs a little and warns you a quarter before stress shows up.", opts: [{ v: "off", label: "Don't use" }, { v: "on", label: "Use it" }], def: "on" },
     { key: "act", label: "Position this quarter", tip: "Trim or sell at today's price (costs 0.25 points bid-ask, mock), or add 50% more.", opts: [{ v: "hold", label: "Hold" }, { v: "trim", label: "Trim 50%" }, { v: "sell", label: "Sell all" }, { v: "add", label: "Add 50%" }], def: "hold", once: true },
   ],
   shocks: [
@@ -272,12 +275,13 @@ const wholeloan: Role = {
     work: "Sellers such as Wells Fargo (the bank lender); third-party review, TPR firms such as Clayton (the deal's independent inspector); Equifax or TransUnion (the credit bureaus) for a credit refresh on the tape; sponsors such as Redwood Trust (the private-label sponsor) if you securitize.",
     paid: "Buy below what the loans are worth, earn carry (interest income minus funding cost) while you hold, and sell or securitize at a profit.",
     goal: "Make money over 5 quarters without getting stuck with a big, aging inventory when rates move.",
+    tip: "Check before you buy: the credit refresh is on by default, so diligence can catch weak tapes and you can walk away instead of overpaying (the winner's curse).",
   },
   quarters: 5,
   decisions: [
     { key: "bid", label: "Your bid (points vs the model price)", tip: "Low bids rarely win; aggressive bids win often but risk the winner's curse (you won because you overpaid).", opts: [{ v: "pass", label: "Pass" }, { v: "low", label: "Low (−2)" }, { v: "market", label: "Market (−0.5)" }, { v: "aggr", label: "Aggressive (+0.5)" }], def: "market" },
     { key: "dil", label: "Due diligence sample (share of loan files re-checked)", tip: "Third-party review (the deal's independent inspector) checks files for errors and fraud. Bigger samples cost more but catch more problems.", opts: [{ v: "10", label: "10%" }, { v: "25", label: "25%" }, { v: "100", label: "100%" }], def: "25" },
-    { key: "refresh", label: "Credit refresh on the tape", tip: REFRESH_TIP + " Updates every borrower's score before you bid, so you see who has weakened since the loan was made.", opts: [{ v: "no", label: "No" }, { v: "yes", label: "Yes" }], def: "no" },
+    { key: "refresh", label: "Credit refresh on the tape", tip: REFRESH_TIP + " Updates every borrower's score before you bid, so you see who has weakened since the loan was made.", opts: [{ v: "no", label: "No" }, { v: "yes", label: "Yes" }], def: "yes" },
     { key: "exit", label: "Inventory plan this quarter", tip: "Hold for carry, flip (sell everything, 0.5 points cost, mock), or securitize (package into bonds; needs approx. $300M of loans, nets approx. +1 point, mock).", opts: [{ v: "hold", label: "Hold" }, { v: "flip", label: "Flip" }, { v: "sec", label: "Securitize" }], def: "hold", once: true },
   ],
   shocks: [
@@ -346,6 +350,7 @@ const whlender: Role = {
     work: "Nonbank lenders (three fictional clients here); the document custodian (the note vault) that holds notes for you; Fannie Mae and Freddie Mac (the agency guarantors) whose purchases repay you.",
     paid: "Interest at SOFR plus a spread on what each client has drawn, minus your bank's funding cost.",
     goal: "Earn spread over 6 quarters without big losses when a client fails or loans get stuck on your line.",
+    tip: "Weak clients pay more but can fail. Tight covenants, margin calls and a collateral refresh (on twice a year by default) warn you before a client collapses.",
   },
   quarters: 6,
   decisions: [
@@ -357,7 +362,7 @@ const whlender: Role = {
     { key: "cov", label: "Covenants (tangible net worth and liquidity minimums)", tip: "Rules the client must meet, such as tangible net worth, TNW (equity minus intangibles) and cash on hand. Tight covenants catch trouble early but cost volume.", opts: [{ v: "loose", label: "Loose" }, { v: "standard", label: "Standard" }, { v: "tight", label: "Tight" }], def: "standard" },
     { key: "aging", label: "Aging limit (max days a loan can sit on the line)", tip: "Loans older than this must be repaid or marked down. Short limits stop stale, hard-to-sell loans piling up.", opts: [{ v: "60", label: "60 days" }, { v: "45", label: "45 days" }, { v: "30", label: "30 days" }], def: "45" },
     { key: "margin", label: "Margin calls (demanding cash when collateral loses value)", tip: "Strict: call for cash as soon as collateral falls. Lenient: give clients time.", opts: [{ v: "strict", label: "Strict" }, { v: "lenient", label: "Lenient" }], def: "strict" },
-    { key: "refresh", label: "Collateral credit refresh (re-checking pledged loans)", tip: REFRESH_TIP + " Shows weakening pledged loans so you margin-call early.", opts: [{ v: "none", label: "None" }, { v: "semi", label: "Twice a year" }, { v: "quarterly", label: "Quarterly" }], def: "none" },
+    { key: "refresh", label: "Collateral credit refresh (re-checking pledged loans)", tip: REFRESH_TIP + " Shows weakening pledged loans so you margin-call early.", opts: [{ v: "none", label: "None" }, { v: "semi", label: "Twice a year" }, { v: "quarterly", label: "Quarterly" }], def: "semi" },
   ],
   shocks: [
     { id: "collapse", label: "Client volume collapse", desc: "Rates jump and mortgage volume halves. Thin-capital clients burn cash and may fail.", credit: true },
@@ -407,6 +412,7 @@ const analyst: Role = {
     work: "Banks such as JPMorgan, Wells Fargo or Texas Capital (the warehouse lenders); Fannie Mae and Freddie Mac (the agency guarantors), whose early funding programs pay you sooner; dealers for TBA hedges and gestation repo (financing while the bond is born).",
     paid: "Your company earns a gain on sale (mock approx. 0.9% of volume). Your job is to keep interest cost, haircut cash and hedge losses from eating it.",
     goal: "Keep liquidity headroom above zero, never blow through a line limit, and keep the most gain on sale over 7 quarters.",
+    tip: "Spread your loans across banks so one bank cutting its line can't strand you. Daily pre-close credit monitoring (on by default) keeps loans from getting stuck on your lines.",
   },
   quarters: 7,
   decisions: [
@@ -414,7 +420,7 @@ const analyst: Role = {
     { key: "speed", label: "Getting loans off the lines (dwell time)", tip: "Dwell time (days on the line). Early funding (getting paid sooner) from Fannie Mae or Freddie Mac cuts dwell for a small fee; gestation repo moves pooled loans to cheaper dealer financing.", opts: [{ v: "standard", label: "Standard (approx. 25 days)" }, { v: "early", label: "Early funding (approx. 12 days)" }, { v: "gestation", label: "Gestation repo" }], def: "standard" },
     { key: "cushion", label: "Liquidity cushion (cash kept on hand)", tip: "Cash for haircuts and margin calls. Banks' covenants require a minimum (mock $150M); extra cash costs carry.", opts: [{ v: "200", label: "$200M" }, { v: "400", label: "$400M" }, { v: "600", label: "$600M" }], def: "400" },
     { key: "hedge", label: "Pipeline hedge ratio (TBA shorts against rate locks)", tip: "Rate locks lose value if rates rise. Hedging 100% overhedges, because some borrowers walk away (fallout) when rates fall.", opts: [{ v: "0", label: "0%" }, { v: "50", label: "50%" }, { v: "90", label: "90%" }], def: "50" },
-    { key: "precl", label: "Pre-close credit refresh", tip: REFRESH_TIP + " Here: one refresh before closing, or daily monitoring that catches new debts early, so fewer loans get stuck unsellable on your lines.", opts: [{ v: "one", label: "One refresh" }, { v: "daily", label: "Daily monitoring" }], def: "one" },
+    { key: "precl", label: "Pre-close credit refresh", tip: REFRESH_TIP + " Here: one refresh before closing, or daily monitoring that catches new debts early, so fewer loans get stuck unsellable on your lines.", opts: [{ v: "one", label: "One refresh" }, { v: "daily", label: "Daily monitoring" }], def: "daily" },
   ],
   shocks: [
     { id: "cut", label: "A bank cuts your line", desc: "Bank 2 (regional bank) pulls its line. Anything allocated there must move to the other banks.", credit: true },
@@ -459,16 +465,17 @@ const aggregator: Role = {
   intro: {
     job: "You own a mock $100B book of mortgage servicing rights, MSRs (the right to collect the fee). Each quarter a $20B bulk MSR package is for sale, and you can also sell part of yours. MSRs are priced as a multiple of the 0.25% servicing fee (approx. 4.2× here, mock).",
     work: "Sellers such as banks and other lenders; Fannie Mae and Freddie Mac (the agency guarantors), which must approve transfers; banks that lend on MSR financing lines (a loan against servicing rights); Equifax (the credit bureau) for a portfolio credit refresh.",
-    paid: "Servicing fees minus the cost of servicing, plus gains if you buy cheap or sell rich. MSR values rise when rates rise (fewer refinances) and fall when rates fall.",
+    paid: "Servicing fees minus the cost of servicing, plus gains if you buy cheap or sell rich. MSR values rise when rates rise (fewer refinances) and fall when rates fall. When your borrowers refinance, you win some of them back (recapture, approx. 30% here, mock).",
     goal: "Grow fee income over 7 quarters without overpaying for weak packages or getting margin-called on your MSR line.",
+    tip: "Hedging protects you if rates fall: falling rates mean refinances and lower MSR values. The game starts you with a 75% hedge and low leverage; no hedge plus high leverage is the high-risk path.",
   },
   quarters: 7,
   decisions: [
     { key: "act", label: "This quarter's move", tip: "Buy the $20B package (if your bid wins), sell 20% of your own MSRs, or hold.", opts: [{ v: "hold", label: "Hold" }, { v: "buy", label: "Bid on package" }, { v: "sell", label: "Sell 20%" }], def: "hold", once: true },
     { key: "bid", label: "Your bid vs the market multiple", tip: "MSR multiple (price as years of fee): 4.2× means paying 4.2 times one year's 0.25% fee. The market multiple starts near 4.2× (mock) and moves with rates. Bidding above market wins more often but risks overpaying.", opts: [{ v: "lo", label: "Low (market − 0.3×)" }, { v: "mkt", label: "At market" }, { v: "hi", label: "High (market + 0.3×)" }], def: "mkt" },
-    { key: "dil", label: "Portfolio diligence incl. credit refresh", tip: REFRESH_TIP + " A batch refresh of the package shows hidden delinquency risk before you pay.", opts: [{ v: "none", label: "Tape only" }, { v: "refresh", label: "Refresh the package" }], def: "none" },
-    { key: "lev", label: "MSR financing line (borrowing against your MSRs)", tip: "Loan-to-value, LTV, on your MSR line at approx. SOFR + 3% (mock). More leverage boosts returns but risks margin calls if MSR values fall.", opts: [{ v: "0", label: "None" }, { v: "40", label: "40% LTV" }, { v: "60", label: "60% LTV" }], def: "40" },
-    { key: "hedge", label: "Rate hedge on the MSR book", tip: "Hedges that gain when rates fall, offsetting MSR losses.", opts: [{ v: "0", label: "None" }, { v: "50", label: "50%" }, { v: "90", label: "90%" }], def: "0" },
+    { key: "dil", label: "Portfolio diligence incl. credit refresh", tip: REFRESH_TIP + " A batch refresh of the package shows hidden delinquency risk before you pay.", opts: [{ v: "none", label: "Tape only" }, { v: "refresh", label: "Refresh the package" }], def: "refresh" },
+    { key: "lev", label: "MSR financing line (borrowing against your MSRs)", tip: "Loan-to-value, LTV, on your MSR line at approx. SOFR + 3% (mock). More leverage boosts returns but risks margin calls if MSR values fall.", opts: [{ v: "0", label: "None" }, { v: "20", label: "20% LTV" }, { v: "40", label: "40% LTV" }, { v: "60", label: "60% LTV" }], def: "20" },
+    { key: "hedge", label: "Rate hedge on the MSR book", tip: "Hedges that gain when rates fall, offsetting MSR losses.", opts: [{ v: "0", label: "None" }, { v: "50", label: "50%" }, { v: "75", label: "75%" }, { v: "90", label: "90%" }], def: "75" },
   ],
   shocks: [
     { id: "fall", label: "Rates fall 1% (MSR values drop)", desc: "Refinancing jumps; MSRs lose value and payoffs shrink your book." },
@@ -480,7 +487,7 @@ const aggregator: Role = {
     { key: "ltv", label: "MSR line loan-to-value", tip: "Debt vs MSR value. Above approx. 65% the bank makes a margin call (mock).", fmt: (v) => Math.round(v) + "%", status: (v) => st3(v, (x) => x < 50, (x) => x < 65) },
     { key: "sens", label: "Loss if rates fall 1%", tip: "Approx. MSR value lost in a 1-point drop, after hedges.", fmt: mm, status: (v) => st3(v, (x) => x < 120, (x) => x < 200) },
   ],
-  init: () => ({ upb: 100000, r: 6.5, liq: 600, debt: 420, adj: 0 }),
+  init: () => ({ upb: 100000, r: 6.5, liq: 600, debt: 210, adj: 0 }),
   offer: () => "This quarter's package: approx. $20B of agency loans' servicing rights (mock). Hidden quality varies; a credit refresh reveals it.",
   step: (s, d, shock, rng, t, seed) => {
     const parts: Record<string, number> = {}; let note = "";
@@ -489,7 +496,7 @@ const aggregator: Role = {
     const cpr = clamp(0.08 + Math.max(0, 6.5 - s.r) * 0.12, 0.04, 0.45), run = s.upb * cpr / 4;
     parts["Servicing fees"] = s.upb * 0.0025 / 4; parts["Servicing costs"] = -s.upb * 0.0007 / 4 * (shock === "dq" ? 1.5 : 1);
     const mtm = s.upb * 0.0025 * (m - m0); parts["MSR mark (rates)"] = mtm; parts["Hedge"] = -mtm * h * 0.85 - 0.3 * h * 2;
-    parts["Payoff runoff"] = -run * 0.0025 * m; s.upb -= run;
+    parts["Payoff runoff"] = -run * 0.0025 * m; parts["Refi recapture"] = run * 0.3 * 0.0025 * m; s.upb -= run * 0.7;
     if (shock === "dq") { parts["Weak-loan markdown"] = s.upb * 0.0025 * Math.min(0, s.adj) * 0.5; }
     if (d.dil === "refresh") parts["Diligence + refresh"] = -0.15;
     if (d.act === "buy") {
@@ -511,7 +518,7 @@ const aggregator: Role = {
   refreshOn: (d) => d.dil === "refresh", refreshNode: "msrowner",
   refreshText: "MSR bids are usually priced off loan tapes with origination scores. A batch credit refresh of the package shows which borrowers have weakened, so you don't overpay for servicing that will be costly and short-lived.",
   benchmark: 93,
-  pro: { bid: { v: "mkt", why: "Bid near the market multiple; overpaying is permanent, missing a package isn't." }, dil: { v: "refresh", why: "A refresh costs little next to a $200M purchase and catches weak packages." }, lev: { v: "40", why: "Moderate leverage leaves room before a margin call when rates fall." }, hedge: { v: "50", why: "A partial hedge protects against a refinance wave while keeping upside." } },
+  pro: { bid: { v: "mkt", why: "Bid near the market multiple; overpaying is permanent, missing a package isn't." }, dil: { v: "refresh", why: "A refresh costs little next to a $200M purchase and catches weak packages." }, lev: { v: "20", why: "Low leverage leaves plenty of room before a margin call when rates fall." }, hedge: { v: "75", why: "A solid partial hedge protects against a refinance wave while keeping some upside if rates rise." } },
   playbook: ["Buy MSRs when rates are high and refinancing is slow, at or below market multiples.", "Refresh credit on packages before bidding.", "Keep leverage moderate and hedge part of the rate risk."],
   lessons: ["MSR value is a bet on rates: falling rates mean payoffs and lower value.", "Leverage on MSRs turns a value drop into a cash call.", "Package quality (delinquencies) is hidden in the tape unless you refresh."],
 };

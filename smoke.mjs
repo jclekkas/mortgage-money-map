@@ -52,6 +52,7 @@ async function roleTests(D, tag, strip) {
   for (const id of ROLE_IDS) {
     await tclick(T("role-pick-" + id)); await sleep(150);
     await D.check(`role ${id} intro`);
+    if (!(await P.$(T("role-tip")))) errors.push(`${tag} ${id} missing beginner tip`);
     await P.evaluate(() => document.querySelector(".role-terms .term")?.dispatchEvent(new MouseEvent("click", { bubbles: true }))); await sleep(100); await D.check(`role ${id} term tip`); await P.evaluate(() => document.body.dispatchEvent(new MouseEvent("click", { bubbles: true })));
     if (id === "servicer" || id === "analyst") { await P.evaluate(() => document.querySelector(".main").scrollTo(0, 0)); await D.shot(`${tag}-role-${id}-intro`); }
     await setVal(T("role-scn"), "random"); await setVal(T("role-seed"), 7); await sleep(80);

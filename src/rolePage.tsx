@@ -70,6 +70,7 @@ export function RolePage({ roleId, setRoleId, onCredit, onMap }: { roleId: strin
         <div className="role-col">
           <Panel title={role.title}>
             <Props items={[{ label: "Your job", value: role.intro.job }, { label: "Who you work with", value: role.intro.work }, { label: "How you get paid", value: role.intro.paid }, { label: "How you win", value: role.intro.goal }]} />
+            {role.intro.tip && <div className="role-tipbox" data-testid="role-tip"><b>Beginner tip:</b> {role.intro.tip}</div>}
             <div className="role-terms"><span className="dim">Key terms (tap): </span>{(ROLE_TERMS[role.id] ?? []).map((k) => <Term key={k} k={k} />)}</div>
             <div className="legal" style={{ marginTop: 8 }}>You play {role.example}. {DISC}</div>
           </Panel>

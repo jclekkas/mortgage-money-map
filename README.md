@@ -82,7 +82,7 @@ Each game has:
 
 When your credit refresh is switched on, you get early warning before credit shocks. The scorecard links each role back to the refresh opportunity sizing on the Credit checks page.
 
-The scenario options are random shocks, a calm market, or one chosen shock in quarter 3. A seed makes every game replayable: the same seed and the same choices always give the same result, on any device. The URL hash remembers the open role (`r=`).
+The scenario options are random shocks, a calm market, or one chosen shock in quarter 3. The default choices are deliberately beginner-safe: hedges, reinsurance, the safest tranche and credit refreshes start switched on, and each intro has a beginner tip. Switching the safety nets off (for example no hedge and 60% leverage as the MSR aggregator) is the high-risk path, and it can lose heavily. A seed makes every game replayable: the same seed and the same choices always give the same result, on any device. The URL hash remembers the open role (`r=`).
 
 All game figures are **mock and illustrative**, not any firm's terms, prices or results. Named firms appear only as examples of a role. The game engine is in `src/roles.ts` and the page is `src/rolePage.tsx`.
 
